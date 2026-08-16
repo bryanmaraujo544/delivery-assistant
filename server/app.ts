@@ -28,10 +28,26 @@ export async function construirApp(opts: { enviador?: EnviadorEmail } = {}) {
   })
 
   const ehProducao = process.env.NODE_ENV === 'production'
-  const permitidas = (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
+  const entradas = (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean)
+
+  const permitidas = entradas.filter((o) => !o.includes('*'))
+
+  /**
+   * Curinga para preview deploy da Vercel.
+   *
+   * Cada PR ganha uma URL nova (`projeto-a1b2c3.vercel.app`), entao lista fixa
+   * quebraria todo preview. Mas aceitar `*.vercel.app` inteiro deixaria
+   * QUALQUER projeto hospedado la chamar esta API com credenciais.
+   *
+   * O curinga cobre apenas o trecho variavel: `https://projeto-*.vercel.app`
+   * vira um regex ancorado, e o `*` so casa com [a-z0-9-].
+   */
+  const padroes = entradas
+    .filter((o) => o.includes('*'))
+    .map((o) => new RegExp('^' + o.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\*/g, '[a-z0-9-]+') + '$'))
 
   await app.register(cors, {
     // front e API ficam em origens diferentes (SPA estatica + processo Node)
@@ -39,6 +55,7 @@ export async function construirApp(opts: { enviador?: EnviadorEmail } = {}) {
       // requisicao sem Origin (curl, health check do Railway) nao e do navegador
       if (!origem) return cb(null, true)
       if (permitidas.includes(origem)) return cb(null, true)
+      if (padroes.some((re) => re.test(origem))) return cb(null, true)
 
       // Em desenvolvimento, aceitar localhost em QUALQUER porta: o Vite troca
       // de porta quando a 5173 esta ocupada, e ficar perseguindo porta no .env

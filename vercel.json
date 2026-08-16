@@ -1,0 +1,25 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "//": "Fallback de SPA: o roteamento e do cliente, entao abrir /fichas direto ou recarregar a pagina precisa devolver index.html em vez de 404.",
+      "source": "/((?!assets/).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "//": "O service worker NAO pode ser cacheado: se ficar preso numa versao antiga, a usuaria continua rodando um app velho mesmo depois do deploy, sem forma de sair disso.",
+      "source": "/sw.js",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }]
+    },
+    {
+      "//": "Assets tem hash no nome, entao podem ser cacheados para sempre.",
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    }
+  ]
+}

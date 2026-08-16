@@ -49,7 +49,7 @@ Decisões e aprendizados vão em [APRENDIZADOS.md](APRENDIZADOS.md) — aqui fic
 - [x] **Escopo da v1 completo** (núcleo de custo + UX anti-digitação)
 - [x] Destravar boot em produção sem `RESEND_API_KEY`
 - [x] Preços do seed — resolvido perguntando no onboarding, não pesquisando
-- [ ] Deploy no Railway
+- [ ] Deploy: API na Railway + front na Vercel (configs prontas e verificadas)
 
 ---
 
@@ -456,6 +456,39 @@ R$ 0,87 → **R$ 0,76**. Recálculo em cascata funcionando desde o primeiro minu
 quando o banco está vazio — e **se desmontava ao criar os próprios dados**,
 levando junto o estado da segunda etapa. Agora, uma vez ativado, fica até
 sinalizar que terminou.
+
+### 2026-08-15 — Deploy configurado: Vercel (front) + Railway (API)
+
+Cheguei a juntar tudo num serviço só (Fastify servindo o front), mas Bryan
+preferiu o front na Vercel — CDN, cache de borda e preview por PR. Revertido.
+
+**Feito:**
+- `vercel.json` — build, output, fallback de SPA e cache
+- `railway.json` volta a buildar só o servidor
+- CORS ganha **curinga restrito ao projeto** para os preview deploys
+- `vite.config.ts` **falha o build na Vercel** se faltar `VITE_API_URL`
+
+**Verificado:**
+| Origem | Resultado |
+|---|---|
+| `precifica.vercel.app` | permitido |
+| `precifica-a1b2c3.vercel.app` (preview) | permitido |
+| `precifica-git-feat-x.vercel.app` | permitido |
+| `projeto-de-outra-pessoa.vercel.app` | **bloqueado** |
+| `evil.com` | bloqueado |
+| `localhost:5173` em produção | bloqueado |
+
+Build local passa; `VERCEL=1` sem `VITE_API_URL` **falha** com mensagem
+explicativa; com a variável, ela é embutida no bundle.
+
+**Imprecisão minha corrigida:** eu havia escrito no doc que o build falhava sem
+`VITE_API_URL`. Não falhava — passava, e o erro só estourava em runtime, o que
+significaria deploy bem-sucedido e tela branca no celular. Preferi tornar o doc
+verdadeiro a corrigir o doc.
+
+**Cache do service worker:** `/sw.js` marcado como `must-revalidate` e
+`/assets/*` como `immutable`. SW preso em versão antiga deixaria a usuária
+rodando um app velho depois do deploy, sem forma de sair.
 
 **Pendências abertas:**
 - Renomear o repositório: `delivery-assistant` não tem relação com o produto

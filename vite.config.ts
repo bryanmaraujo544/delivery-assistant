@@ -3,6 +3,26 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+/**
+ * Falha o build na Vercel quando `VITE_API_URL` nao esta definida.
+ *
+ * A variavel e lida em BUILD TIME. Sem ela, o build passaria, o deploy seria
+ * publicado com sucesso, e a quebra so apareceria como tela branca no celular
+ * de alguem — com a causa escondida no console.
+ *
+ * `VERCEL` so existe no ambiente de build deles, entao build local segue
+ * funcionando sem configurar nada.
+ */
+function exigirApiUrlNaVercel() {
+  if (process.env.VERCEL && !process.env.VITE_API_URL) {
+    throw new Error(
+      'VITE_API_URL nao definida. Configure em Environment Variables na Vercel ' +
+        'ANTES do build — o valor e embutido no bundle e mudar exige rebuild.',
+    )
+  }
+}
+exigirApiUrlNaVercel()
+
 export default defineConfig({
   server: {
     // 0.0.0.0: sem isso o dev server so aceita conexao do proprio computador,

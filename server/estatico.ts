@@ -4,16 +4,15 @@ import estatico from '@fastify/static'
 import type { FastifyInstance } from 'fastify'
 
 /**
- * Serve o front (dist/) pelo proprio Fastify.
+ * Serve o front (dist/) pelo proprio Fastify — CONVENIENCIA LOCAL, nao producao.
  *
- * A alternativa seria CDN separada, e ate era o plano. Servir do mesmo processo
- * elimina de uma vez:
- *  - CORS (mesma origem — nao existe requisicao cross-origin);
- *  - VITE_API_URL (o front chama caminho relativo);
- *  - o segundo deploy e o segundo host.
+ * Em producao o front vai para a Vercel (CDN, cache de borda, preview por PR) e
+ * a Railway roda so a API, que nem gera `dist/`. Esta funcao entao nao encontra
+ * a pasta e sai silenciosamente.
  *
- * O custo e o front sair de um Node em vez de uma CDN. Nesta escala — um app de
- * precificacao com dezenas de usuarias — isso nao aparece em lugar nenhum.
+ * Ela existe para permitir `npm run build:all && npm start` e testar o bundle de
+ * producao inteiro num comando so, sem subir dois processos. Foi assim que se
+ * verificou o fallback de SPA e a precedencia das rotas de API.
  *
  * As ROTAS DE API tem precedencia: sao registradas antes, e o fallback de SPA
  * ignora explicitamente os prefixos delas.

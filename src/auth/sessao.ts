@@ -23,13 +23,26 @@ const CHAVE = 'precifica.sessao'
  * host de onde o front veio faz o teste em aparelho real funcionar sem
  * configurar nada.
  */
-export const API =
-  import.meta.env.VITE_API_URL ??
-  // Em producao o front e servido pelo PROPRIO Fastify: mesma origem, caminho
-  // relativo, sem CORS. Em dev sao processos separados (Vite 5173, API 3333),
-  // entao apontamos para a porta da API no mesmo host — o que tambem faz o
-  // teste pelo celular funcionar sem configurar nada.
-  (import.meta.env.PROD ? '' : `${location.protocol}//${location.hostname}:3333`)
+function resolverApi(): string {
+  const configurada = import.meta.env.VITE_API_URL
+  if (configurada) return configurada
+
+  // Em producao o front (Vercel) e a API (Railway) estao em dominios
+  // diferentes, entao VITE_API_URL e OBRIGATORIA — e lida em BUILD TIME.
+  // Falhar alto aqui e melhor que um app publicado tentando falar com
+  // localhost e falhando em toda tela, sem dizer por que.
+  if (import.meta.env.PROD) {
+    throw new Error(
+      'VITE_API_URL nao definida no build. Configure na Vercel antes de publicar.',
+    )
+  }
+
+  // Em dev sao dois processos no mesmo host. Derivar do hostname (em vez de
+  // fixar "localhost") faz o teste pelo celular funcionar sem configurar nada.
+  return `${location.protocol}//${location.hostname}:3333`
+}
+
+export const API = resolverApi()
 
 export interface Sessao {
   token: string
