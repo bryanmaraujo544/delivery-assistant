@@ -13,7 +13,18 @@
 
 const CHAVE = 'precifica.sessao'
 
-export const API = import.meta.env.VITE_API_URL ?? 'http://localhost:3333'
+/**
+ * Endereco da API.
+ *
+ * Em producao vem de VITE_API_URL (lida em build time).
+ *
+ * Em desenvolvimento NAO da para fixar "localhost": quando o app e aberto do
+ * celular pelo IP da maquina, "localhost" seria o proprio celular. Derivar do
+ * host de onde o front veio faz o teste em aparelho real funcionar sem
+ * configurar nada.
+ */
+export const API =
+  import.meta.env.VITE_API_URL ?? `${location.protocol}//${location.hostname}:3333`
 
 export interface Sessao {
   token: string

@@ -5,6 +5,10 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   server: {
+    // 0.0.0.0: sem isso o dev server so aceita conexao do proprio computador,
+    // e testar no celular exigiria deploy. Com host aberto, basta abrir o IP
+    // da maquina na mesma Wi-Fi.
+    host: true,
     // O Vite nao le PORT por conta propria: se a porta padrao estiver ocupada,
     // ele pula para a proxima e quem orquestra o processo fica apontando para
     // o lugar errado. Honrar PORT torna o dev server previsivel para qualquer

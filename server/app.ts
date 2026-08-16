@@ -43,9 +43,15 @@ export async function construirApp(opts: { enviador?: EnviadorEmail } = {}) {
       // de porta quando a 5173 esta ocupada, e ficar perseguindo porta no .env
       // faz o CORS falhar de um jeito que parece bug da aplicacao.
       // Em producao essa brecha nao existe — so a lista explicita vale.
-      if (!ehProducao && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origem)) {
-        return cb(null, true)
-      }
+      // Em dev, aceitar localhost E IP de rede privada (10.x, 172.16-31.x,
+      // 192.168.x): e assim que o celular na mesma Wi-Fi alcanca a API.
+      // Faixa privada apenas — nunca IP publico, nem em dev.
+      const devLocal =
+        /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origem) ||
+        /^https?:\/\/(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/.test(
+          origem,
+        )
+      if (!ehProducao && devLocal) return cb(null, true)
 
       cb(new Error(`origem nao permitida: ${origem}`), false)
     },

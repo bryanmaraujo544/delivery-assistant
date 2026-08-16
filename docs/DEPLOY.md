@@ -11,6 +11,37 @@ A API não pode ir junto com o front porque Fastify é um processo de longa dura
 
 ---
 
+## 0. Testar no celular SEM deploy
+
+Não é preciso publicar nada para usar o app num aparelho real — basta estar na
+mesma Wi-Fi. É assim que se testa PWA em iPhone (instalar na tela de início) e
+o comportamento de mão suja/tela pequena que nenhum screenshot revela.
+
+```bash
+# terminal 1 — API
+npm run api:dev
+
+# terminal 2 — front
+npm run dev
+
+# descobrir o IP da máquina
+ip -4 addr show scope global | grep -oE 'inet [0-9.]+'
+```
+
+No celular, abra **`http://SEU_IP:5173`** (ex.: `http://192.168.1.13:5173`).
+
+Funciona sem configurar nada porque:
+- o Vite escuta em `0.0.0.0` (`server.host: true`);
+- o front **deriva o endereço da API do host de onde ele mesmo foi servido** —
+  fixar `localhost` faria o celular chamar a si próprio;
+- o CORS em dev aceita faixas de **IP privado** (10.x, 172.16–31.x, 192.168.x).
+  IP público continua bloqueado mesmo em dev.
+
+**Limitação real:** sem HTTPS, o navegador não instala o PWA nem libera câmera e
+microfone. Para testar a instalação na tela de início — que é o spike 2, ainda
+aberto — é preciso HTTPS: use um túnel (`cloudflared tunnel --url
+http://localhost:5173`) ou faça o deploy.
+
 ## 1. API no Railway
 
 ### Variáveis de ambiente

@@ -40,17 +40,40 @@ class EnviadorConsole implements EnviadorEmail {
   }
 }
 
+/**
+ * Sem chave configurada, qualquer envio falha ALTO — mas só quando alguém
+ * tenta enviar, não no boot.
+ */
+class EnviadorIndisponivel implements EnviadorEmail {
+  async enviar() {
+    throw new Error('envio de e-mail não configurado (falta RESEND_API_KEY)')
+  }
+}
+
+/**
+ * Escolhe o enviador.
+ *
+ * ATE 15/08/2026 isto derrubava o processo em producao quando faltava a chave.
+ * Fazia sentido enquanto OTP era o unico login: sem e-mail, ninguem entrava.
+ *
+ * Com login por SENHA, e-mail deixou de ser caminho critico — so o OTP usa. Um
+ * throw no boot passou a impedir o deploy inteiro por causa de um metodo de
+ * login secundario. Agora a falha e adiada para o momento do envio: quem tentar
+ * OTP sem chave recebe erro claro, e o resto do app sobe normalmente.
+ */
 export function criarEnviador(): EnviadorEmail {
   const apiKey = process.env.RESEND_API_KEY
   const remetente = process.env.EMAIL_REMETENTE
 
   if (!apiKey) {
-    // Em producao isso seria um login silenciosamente quebrado — barrar cedo.
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('RESEND_API_KEY ausente em producao')
-    }
-    console.warn('[email] RESEND_API_KEY ausente — usando console (dev)')
-    return new EnviadorConsole()
+    console.warn(
+      process.env.NODE_ENV === 'production'
+        ? '[email] RESEND_API_KEY ausente — login por OTP indisponível (senha continua funcionando)'
+        : '[email] RESEND_API_KEY ausente — usando console (dev)',
+    )
+    return process.env.NODE_ENV === 'production'
+      ? new EnviadorIndisponivel()
+      : new EnviadorConsole()
   }
 
   if (!remetente) throw new Error('EMAIL_REMETENTE ausente (ex.: "Precifica <login@seu-dominio.com>")')
