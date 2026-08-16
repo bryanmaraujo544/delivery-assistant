@@ -44,7 +44,8 @@ Decisões e aprendizados vão em [APRENDIZADOS.md](APRENDIZADOS.md) — aqui fic
 - [x] Auth OTP com Resend (endpoints + 15 tabelas, fluxo verificado)
 - [x] Endpoints de sincronização (push/pull) com LWW e isolamento por tenant
 - [x] Sincronização no cliente + tela de login + guarda de rota
-- [ ] Decidir host da API (Fly/Railway/Render)
+- [x] Host da API decidido: **Railway** (~US$ 5/mês) — config e build de produção prontos
+- [ ] Deploy de fato (depende da chave do Resend e das variáveis no Railway)
 
 ---
 
@@ -315,6 +316,30 @@ No Postgres após o sync do navegador: 57 insumos, 2 fichas, 3 itens com quantid
 **Bug pego rodando:** o push falhou com 400 na primeira tentativa — ids `seed-N` não são UUID. Corrigido no gerador **e** com migração que remapeia as referências existentes. Ver [APRENDIZADOS § D](APRENDIZADOS.md#d-decisões-técnicas).
 
 **Decidido (revoga o plano):** sincronização é **LWW por registro**, não fila de outbox. Justificativa nos aprendizados.
+
+### 2026-08-15 — Preparação de deploy (Railway)
+
+**Feito:**
+- `railway.json` — build, start, healthcheck em `/health`, restart on failure
+- `npm run build:server` — esbuild gera bundle único de **31 kb**
+- `docs/DEPLOY.md` — variáveis, migrations, fallback de SPA, checklist
+
+**Bug pego antes de virar incidente:** `dotenv` estava em `devDependencies` e o
+servidor importa em runtime. Em produção, com devDeps podados, o boot quebraria.
+Movido para `dependencies`.
+
+**Verificado:** bundle de produção rodado com `node dist-server/main.js` —
+`/health` conectou no Neon em 135 ms, auth respondeu 200, `/sync` seguiu
+protegido com 401.
+
+**Decidido:** Railway em vez de Render. Railway **não tem free tier real em
+2026** (US$ 5/mês mínimo no Hobby; o plano Free dá só US$ 1/mês em créditos que
+não acumulam). Render tem free de verdade mas hiberna — tolerável aqui por ser
+offline-first. Bryan preferiu pagar para não ter hibernação. Troca não exige
+mudança de código.
+
+**Migrations NÃO rodam automaticamente no deploy**, de propósito — este projeto
+já apanhou de migration que falha em silêncio.
 
 **Pendências abertas:**
 - Renomear o repositório: `delivery-assistant` não tem relação com o produto
