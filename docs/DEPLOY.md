@@ -22,7 +22,7 @@ Configure no painel do Railway (Variables). **Nenhuma delas vai para o repositó
 | `DATABASE_URL` | string do Neon **com** `-pooler` | a aplicação usa o pooler |
 | `DATABASE_URL_UNPOOLED` | a mesma **sem** `-pooler` | só para migrations |
 | `AUTH_SECRET` | 32+ caracteres aleatórios | `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"` |
-| `RESEND_API_KEY` | chave do Resend | **obrigatória** com `NODE_ENV=production` — a API se recusa a subir sem ela |
+| `RESEND_API_KEY` | chave do Resend | **obrigatória** com `NODE_ENV=production` — a API se recusa a subir sem ela. Criar com permissão **Sending access**, restrita ao domínio — ver abaixo |
 | `EMAIL_REMETENTE` | `Precifica <login@seu-dominio.com>` | o domínio precisa estar verificado no Resend |
 | `CORS_ORIGINS` | URL do front, ex.: `https://precifica.pages.dev` | **sem isso o navegador bloqueia todas as chamadas** |
 | `NODE_ENV` | `production` | faz o envio de e-mail falhar alto em vez de cair no console |
@@ -37,6 +37,28 @@ O `railway.json` já configura tudo:
 - **healthcheck**: `/health`, que faz um `select 1` real no Postgres
 
 O servidor já escuta em `0.0.0.0` e lê `process.env.PORT` — requisito de qualquer container.
+
+### Chave do Resend: use **Sending access**, não Full access
+
+O Resend oferece dois níveis:
+
+| Nível | O que permite |
+|---|---|
+| **Full access** | criar, ler, atualizar e apagar **qualquer** recurso — inclusive domínios e outras chaves de API |
+| **Sending access** | **só enviar e-mail**, e pode ser restrita a um domínio específico |
+
+**Use `Sending access` + restrição de domínio.** O código chama exatamente uma
+coisa do Resend — `resend.emails.send()` em `server/email.ts` — e nada mais.
+Nenhuma API de domínios, chaves, audiências ou contatos.
+
+Consequência prática: se a chave vazar (log, dump de env, commit acidental), o
+atacante consegue mandar e-mail em nome do seu domínio — ruim, mas contornável
+revogando a chave. Com **Full access** ele conseguiria também **apagar seu
+domínio verificado e criar outras chaves**, o que transforma um incidente
+recuperável em perda de controle da conta.
+
+A restrição de domínio só fica disponível se a permissão for `Sending access` —
+escolher Full access desabilita esse campo.
 
 ### Migrations
 
