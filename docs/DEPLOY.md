@@ -1,13 +1,12 @@
 # Deploy
 
-São **dois artefatos com naturezas diferentes**, e por isso dois destinos:
+**Um serviço só.** O Fastify serve a API e o front no mesmo processo:
+`npm run build:all` gera `dist/` (front) e `dist-server/main.js` (servidor), e
+`npm start` sobe os dois juntos.
 
-| Artefato | O que é | Onde vai |
-|---|---|---|
-| **Front** (`dist/`) | Arquivos estáticos gerados por `npm run build` | Qualquer CDN — Cloudflare Pages, Vercel, Netlify (todos free) |
-| **API** (`dist-server/main.js`) | Processo Node que precisa ficar ligado | **Railway** (~US$ 5/mês) |
-
-A API não pode ir junto com o front porque Fastify é um processo de longa duração, não uma função sob demanda. Foi a fatura consciente de escolher Fastify em vez de serverless.
+Chegamos aqui depois de planejar dois deploys (CDN + Railway). Juntar eliminou
+CORS, `VITE_API_URL`, o segundo host e o segundo deploy. O custo — front saindo
+de um Node em vez de CDN — não aparece nesta escala.
 
 ---
 
@@ -86,15 +85,14 @@ Depois **confira as tabelas no banco** — não confie na ausência de erro. O s
 de unidades (`drizzle/seed-unidades.sql`) precisa rodar **uma vez**; sem ele as
 FKs de unidade não resolvem e nada é gravável.
 
-## 3. Checklist antes de considerar no ar
+## 2. Checklist antes de considerar no ar
 
 - [ ] Migrations aplicadas e **conferidas no banco**
 - [ ] Seed de unidades rodado uma vez
 - [ ] `/health` respondendo na URL pública do Railway
 - [ ] Abrir a URL no celular e **instalar na tela de início** (HTTPS libera isso) — é o spike 2, ainda aberto
 - [ ] Criar conta por senha e conferir que a sincronização sobe os dados
-- [ ] Login completo por um celular real, não só pelo desktop
-- [ ] **Preços do catálogo semente substituídos** — hoje são placeholders inventados, marcados como estimados na UI. Ver `APRENDIZADOS.md § G`
+- [ ] Confirmar que o onboarding pede os preços e que o custo muda ao corrigir
 
 ---
 
