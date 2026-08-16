@@ -66,6 +66,26 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ---
 
+## Git — exceção deste repositório
+
+O `~/.claude/CLAUDE.md` global exige autorização direta e explícita antes de
+qualquer push ou merge em `main`, a cada vez.
+
+**Neste repositório essa exigência está dispensada.** Bryan autorizou em
+15/08/2026, de forma explícita, empurrar direto para `main` sem pedir.
+
+A dispensa vale **somente aqui**. Em qualquer outro projeto — em especial os
+de trabalho, com acesso a produção — a regra global continua valendo
+integralmente.
+
+O que **não** muda:
+- Commits atômicos: um commit = uma mudança lógica e autocontida.
+- Validar antes de commitar (`tsc --noEmit`, `vitest run`, `npm run build`).
+- Commit e push ao fim de cada bloco terminado, não acumulado no fim.
+- A mensagem carrega o **porquê**, não só o quê.
+- Auditar segredo antes do push: `.env` fora do histórico e varredura por
+  credencial no conteúdo versionado.
+
 ## Project context — read these first, every session
 
 - **[docs/PROGRESSO.md](docs/PROGRESSO.md)** — onde estamos, onde queremos chegar, log do que foi feito. Leia no início de cada sessão e atualize ao final.
