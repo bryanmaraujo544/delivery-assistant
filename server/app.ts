@@ -3,6 +3,7 @@ import rateLimit from '@fastify/rate-limit'
 import { sql } from 'drizzle-orm'
 import Fastify from 'fastify'
 import { registrarRotasAuth } from './auth/rotas'
+import { registrarRotasSenha } from './auth/senha-rotas'
 import { registrarRotasSync } from './sync/rotas'
 import { db, pool } from './db'
 import { criarEnviador, type EnviadorEmail } from './email'
@@ -25,9 +26,29 @@ export async function construirApp(opts: { enviador?: EnviadorEmail } = {}) {
     },
   })
 
+  const ehProducao = process.env.NODE_ENV === 'production'
+  const permitidas = (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
+
   await app.register(cors, {
     // front e API ficam em origens diferentes (SPA estatica + processo Node)
-    origin: (process.env.CORS_ORIGINS ?? 'http://localhost:5173').split(','),
+    origin: (origem, cb) => {
+      // requisicao sem Origin (curl, health check do Railway) nao e do navegador
+      if (!origem) return cb(null, true)
+      if (permitidas.includes(origem)) return cb(null, true)
+
+      // Em desenvolvimento, aceitar localhost em QUALQUER porta: o Vite troca
+      // de porta quando a 5173 esta ocupada, e ficar perseguindo porta no .env
+      // faz o CORS falhar de um jeito que parece bug da aplicacao.
+      // Em producao essa brecha nao existe — so a lista explicita vale.
+      if (!ehProducao && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origem)) {
+        return cb(null, true)
+      }
+
+      cb(new Error(`origem nao permitida: ${origem}`), false)
+    },
     credentials: true,
   })
 
@@ -47,6 +68,7 @@ export async function construirApp(opts: { enviador?: EnviadorEmail } = {}) {
   })
 
   await registrarRotasAuth(app, opts.enviador ?? criarEnviador())
+  await registrarRotasSenha(app)
   await registrarRotasSync(app)
 
   app.addHook('onClose', async () => {

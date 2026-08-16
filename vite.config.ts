@@ -4,6 +4,13 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  server: {
+    // O Vite nao le PORT por conta propria: se a porta padrao estiver ocupada,
+    // ele pula para a proxima e quem orquestra o processo fica apontando para
+    // o lugar errado. Honrar PORT torna o dev server previsivel para qualquer
+    // ferramenta que atribua porta.
+    port: Number(process.env.PORT) || 5173,
+  },
   plugins: [
     react(),
     tailwindcss(),

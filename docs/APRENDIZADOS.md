@@ -386,6 +386,33 @@ Pior: não bastava corrigir o gerador, porque os dados **já gravados** mantinha
 
 **Lição:** id gerado pelo cliente precisa nascer no formato que o servidor aceita, mesmo que o servidor ainda não exista. "Depois eu ajusto" vira migração com reescrita de referências.
 
+### [2026-08-15] Login por senha — REVOGA "OTP é o único método"
+
+**Motivo da mudança:** OTP depende de enviar e-mail, e enviar e-mail depende de **domínio verificado** no Resend. O `onboarding@resend.dev` só entrega para o e-mail da própria conta — serve para o dono testar, mas **nenhuma usuária real consegue receber o código**. Isso bloqueava a v1 inteira.
+
+Senha remove a dependência e **mantém a propriedade que motivou o OTP**: o fluxo nunca sai do app, então não há como perder a sessão voltando do Safari em PWA standalone no iOS.
+
+**As rotas de OTP continuam no ar.** No dia em que existir domínio, voltam a ser oferecidas — o código não foi jogado fora.
+
+**DÍVIDA CONHECIDA:** recuperação de senha **também** precisa de e-mail. Sem domínio, quem esquecer depende de reset manual no banco. A tela diz isso explicitamente em vez de fingir que existe "esqueci minha senha".
+
+**Decisões de hash (`server/auth/senha.ts`):**
+
+| Decisão | Por quê |
+|---|---|
+| **scrypt** do `node:crypto` | Sem dependência nativa para compilar no deploy. Argon2id seria marginalmente melhor, mas módulo nativo é das formas mais comuns de quebrar build em container |
+| **Nunca** sha256/md5 | São rápidos *de propósito* — GPU testa bilhões por segundo. scrypt é memory-hard e derruba essa vantagem |
+| N=2^15, r=8, p=1 | ~100 ms por verificação: lento para o atacante, imperceptível para quem loga. Há teste que falha se cair abaixo de 20 ms |
+| Salt aleatório por usuária | Sem ele, duas pessoas com a mesma senha teriam o mesmo hash, e quebrar uma quebraria as duas |
+| Parâmetros **dentro** do hash (`scrypt$N$r$p$salt$hash`) | Permite encarecer no futuro sem invalidar as senhas existentes |
+| `normalize('NFKC')` | "pão" digitado no iPhone e no Android pode chegar com bytes diferentes e falharia o login |
+| scrypt "à toa" quando a conta não existe | Sem isso, "usuária inexistente" responde na hora e "senha errada" demora 100 ms — a diferença de tempo revela quais e-mails têm conta |
+| Mensagem idêntica para senha errada e conta inexistente | Mesma razão |
+
+**Enumeração no registro é aceita conscientemente:** `/auth/registrar` responde 409 "já existe uma conta". Fingir sucesso deixaria a pessoa presa sem entender. Rate limit contém o abuso.
+
+**Erro de tipo que os testes NÃO pegaram:** `promisify(scrypt)` colapsa as sobrecargas e **perde o parâmetro de opções** — `{N, r, p}` seria silenciosamente ignorado e o hash sairia com parâmetros padrão, bem mais fracos. Vitest não faz typecheck, então os 8 testes passaram; só o `tsc` acusou. Corrigido com wrapper tipado à mão.
+
 ### [2026-08-15] Decisões de segurança do OTP (e por que cada uma)
 
 Implementado em `server/auth/otp.ts` (primitivas puras) e `server/auth/rotas.ts`.

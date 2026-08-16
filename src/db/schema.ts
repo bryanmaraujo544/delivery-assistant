@@ -62,6 +62,11 @@ export const usuario = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     /** sempre minusculo e sem espaco — a normalizacao acontece na aplicacao */
     email: text('email').notNull(),
+    /**
+     * scrypt$N$r$p$salt$hash. NULL para quem entrou por OTP e nunca definiu
+     * senha — os dois metodos coexistem.
+     */
+    senhaHash: text('senha_hash'),
     criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
     ultimoLoginEm: timestamp('ultimo_login_em', { withTimezone: true }),
   },

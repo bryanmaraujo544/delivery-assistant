@@ -7,3 +7,8 @@ dev-dist
 .DS_Store
 tsconfig.tsbuildinfo
 dist-server
+
+# arquivos de editor — .env.swp do vim carrega o conteudo do .env, incluindo segredo
+*.swp
+*.swo
+*~

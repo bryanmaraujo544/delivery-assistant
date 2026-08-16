@@ -41,7 +41,8 @@ Decisões e aprendizados vão em [APRENDIZADOS.md](APRENDIZADOS.md) — aqui fic
 - [x] Tela de fichas técnicas + montador de receita
 - [x] Chips de frecency (modelo Slack, funcionando na UI)
 - [x] Backend: fundação Fastify + Drizzle `node-postgres`, `/health` verificado contra o Neon
-- [x] Auth OTP com Resend (endpoints + 15 tabelas, fluxo verificado)
+- [x] Auth OTP com Resend (endpoints prontos, aguardando domínio verificado)
+- [x] **Auth por e-mail e senha** (scrypt) — método ativo da v1, sem dependência de domínio
 - [x] Endpoints de sincronização (push/pull) com LWW e isolamento por tenant
 - [x] Sincronização no cliente + tela de login + guarda de rota
 - [x] Host da API decidido: **Railway** (~US$ 5/mês) — config e build de produção prontos
@@ -340,6 +341,42 @@ mudança de código.
 
 **Migrations NÃO rodam automaticamente no deploy**, de propósito — este projeto
 já apanhou de migration que falha em silêncio.
+
+### 2026-08-15 — Login por senha (destrava a v1)
+
+**Por quê:** OTP exige domínio verificado no Resend; `onboarding@resend.dev` só
+entrega para o dono da conta, então nenhuma usuária real conseguiria entrar.
+Senha remove a dependência e mantém a propriedade que motivou o OTP — o fluxo
+nunca sai do app, então não quebra em PWA standalone no iOS.
+
+**Feito:**
+- `server/auth/senha.ts` — scrypt com N=2^15, salt por usuária, parâmetros no hash
+- `server/auth/senha-rotas.ts` — `/auth/registrar` e `/auth/entrar`
+- Migration `0002` — coluna `senha_hash` (nullable: OTP e senha coexistem)
+- Tela de login reescrita com alternância entre entrar e criar conta
+- 8 testes novos (total: **48**)
+
+**Verificado contra o banco e no navegador:**
+| Cenário | Resultado |
+|---|---|
+| Registrar | 201 + token, tenant criado |
+| Registrar de novo | 409 |
+| Senha errada | 401 `e-mail ou senha inválidos` |
+| E-mail inexistente | 401 **mensagem idêntica** — sem enumeração |
+| Login correto | token válido para `/sync` e `/auth/eu` |
+| Senha < 8 | 400 |
+| Hash no banco | `scrypt$32768$8$1$…`, sem senha em claro |
+| Navegador: criar conta → `/fichas` | sessão gravada, sync inicia |
+| Navegador: sair → senha errada → senha certa | volta ao login, mensagem genérica, entra |
+
+**Três erros meus no caminho:**
+1. **`pkill -f "tsx server/main.ts"` matava só o processo pai.** O filho sobrevivia segurando a porta 3333, e todo servidor "novo" falhava em bindar em silêncio — eu estava testando contra um servidor antigo, sem as rotas novas. Agora mato **pela porta**, não pelo nome
+2. **`promisify(scrypt)` perdia o parâmetro de opções** — o hash sairia com parâmetros padrão. Vitest não faz typecheck e os 8 testes passaram; só o `tsc` pegou
+3. **Vite não lê `PORT`** — quando a 5173 estava ocupada ele pulou para a 5174 enquanto o orquestrador apontava para outra porta. Corrigido em `vite.config.ts`
+
+**Também:** CORS em dev agora aceita `localhost` em qualquer porta (produção
+continua só com a lista explícita) — porta fixa fazia o CORS falhar de um jeito
+que parecia bug da aplicação.
 
 **Pendências abertas:**
 - Renomear o repositório: `delivery-assistant` não tem relação com o produto
