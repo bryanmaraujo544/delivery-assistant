@@ -24,7 +24,12 @@ const CHAVE = 'precifica.sessao'
  * configurar nada.
  */
 export const API =
-  import.meta.env.VITE_API_URL ?? `${location.protocol}//${location.hostname}:3333`
+  import.meta.env.VITE_API_URL ??
+  // Em producao o front e servido pelo PROPRIO Fastify: mesma origem, caminho
+  // relativo, sem CORS. Em dev sao processos separados (Vite 5173, API 3333),
+  // entao apontamos para a porta da API no mesmo host — o que tambem faz o
+  // teste pelo celular funcionar sem configurar nada.
+  (import.meta.env.PROD ? '' : `${location.protocol}//${location.hostname}:3333`)
 
 export interface Sessao {
   token: string

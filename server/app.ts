@@ -7,6 +7,7 @@ import { registrarRotasSenha } from './auth/senha-rotas'
 import { registrarRotasSync } from './sync/rotas'
 import { db, pool } from './db'
 import { criarEnviador, type EnviadorEmail } from './email'
+import { registrarEstatico } from './estatico'
 
 /**
  * API do app de precificacao.
@@ -76,6 +77,9 @@ export async function construirApp(opts: { enviador?: EnviadorEmail } = {}) {
   await registrarRotasAuth(app, opts.enviador ?? criarEnviador())
   await registrarRotasSenha(app)
   await registrarRotasSync(app)
+
+  // por ultimo: as rotas de API tem precedencia sobre os arquivos do front
+  await registrarEstatico(app)
 
   app.addHook('onClose', async () => {
     await pool.end()
