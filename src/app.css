@@ -1,0 +1,27 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-marca-50: oklch(0.98 0.02 180);
+  --color-marca-500: oklch(0.6 0.11 180);
+  --color-marca-600: oklch(0.52 0.1 180);
+  --color-marca-700: oklch(0.44 0.09 180);
+}
+
+/* Contexto de uso: cozinha. Mao suja, pressa, tela possivelmente molhada.
+   Alvo minimo 48px (acima dos 44px de Apple/Google) e area de toque generosa. */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-white text-slate-900 antialiased;
+    /* respeita a safe area do iPhone em modo standalone */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  button,
+  [role='button'],
+  a {
+    min-height: 48px;
+    touch-action: manipulation;
+  }
+}
