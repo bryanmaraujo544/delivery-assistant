@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { db, normalizar, type FichaLocal, type InsumoLocal } from '../db/local'
+import { formatarBRL } from '../dominio/dinheiro'
+import { CampoDinheiro } from './CampoDinheiro'
 import { construirSeed } from '../db/seed-insumos'
 import type { ItemFicha } from '../dominio/custo'
 
@@ -120,6 +122,9 @@ interface Props {
 
 export function Comecar({ onPronto }: Props) {
   const [ocupado, setOcupado] = useState(false)
+  const [confirmando, setConfirmando] = useState<{ fichaId: string; insumos: InsumoLocal[] } | null>(
+    null,
+  )
 
   async function escolher(perfil: Perfil) {
     setOcupado(true)
@@ -155,7 +160,31 @@ export function Comecar({ onPronto }: Props) {
     }))
 
     await db.fichas.bulkPut(fichas)
-    onPronto(fichas[0]?.id ?? null)
+
+    // Os insumos que a receita de exemplo realmente usa — 6, nao 57.
+    // Perguntar so o que importa e a diferenca entre um passo util e um
+    // formulario que ela abandona.
+    const usados = [
+      ...new Set(
+        fichas.flatMap((f) =>
+          f.itens.filter((i) => i.tipo === 'insumo').map((i) => i.insumoId),
+        ),
+      ),
+    ]
+      .map((id) => insumos.find((i) => i.id === id))
+      .filter((i): i is InsumoLocal => !!i)
+
+    setOcupado(false)
+    setConfirmando({ fichaId: fichas[0]?.id ?? '', insumos: usados })
+  }
+
+  if (confirmando) {
+    return (
+      <ConfirmarPrecos
+        insumos={confirmando.insumos}
+        onPronto={() => onPronto(confirmando.fichaId || null)}
+      />
+    )
   }
 
   return (
@@ -193,6 +222,93 @@ export function Comecar({ onPronto }: Props) {
       <p className="mt-4 text-center text-xs text-slate-400">
         O catálogo vem com preços estimados. Você ajusta conforme for comprando.
       </p>
+    </div>
+  )
+}
+
+/**
+ * Segunda (e ultima) etapa: confirmar os precos que a receita de exemplo usa.
+ *
+ * Existe porque os precos do catalogo semente sao ESTIMATIVA, nao pesquisa.
+ * Tentamos levantar precos reais e a conclusao foi que nao da para fazer isso
+ * de forma confiavel: o que se acha na web e promocao de uma rede, de uma
+ * semana, de uma regiao — e codificar isso trocaria numero inventado por
+ * numero diferentemente errado, agora com falsa autoridade.
+ *
+ * Perguntar resolve melhor que pesquisar: o preco passa a ser o DELA, da
+ * regiao dela, e o custo fica real desde o primeiro minuto. E sao ~6 campos,
+ * nao 57 — so os que a receita de exemplo usa.
+ */
+function ConfirmarPrecos({
+  insumos,
+  onPronto,
+}: {
+  insumos: InsumoLocal[]
+  onPronto: () => void
+}) {
+  const [precos, setPrecos] = useState<Record<string, number>>(
+    Object.fromEntries(insumos.map((i) => [i.id, i.precoEmbalagemCentavos])),
+  )
+  const [salvando, setSalvando] = useState(false)
+
+  async function salvar() {
+    setSalvando(true)
+    await db.transaction('rw', db.insumos, async () => {
+      for (const i of insumos) {
+        const novo = precos[i.id] ?? i.precoEmbalagemCentavos
+        await db.insumos.update(i.id, {
+          precoEmbalagemCentavos: novo,
+          // confirmado por ela deixa de ser estimativa — o badge "est." some
+          precoEstimado: novo === i.precoEmbalagemCentavos ? i.precoEstimado : false,
+          atualizadoEm: Date.now(),
+        })
+      }
+    })
+    onPronto()
+  }
+
+  return (
+    <div className="mt-8 pb-8">
+      <h2 className="text-xl font-bold text-slate-900">Quanto você paga nestes?</h2>
+      <p className="mt-1 text-sm text-slate-600">
+        Os valores abaixo são estimativa nossa. Corrigir agora deixa o custo certo desde o começo
+        — e você pode pular e ajustar depois.
+      </p>
+
+      <ul className="mt-5 space-y-3">
+        {insumos.map((i) => (
+          <li key={i.id} className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="font-medium text-slate-900">{i.nome}</span>
+              <span className="shrink-0 text-sm text-slate-500">
+                {i.embalagemQuantidade} {i.embalagemUnidade}
+              </span>
+            </div>
+            <div className="mt-2">
+              <CampoDinheiro
+                valorCentavos={precos[i.id] ?? 0}
+                onChange={(c) => setPrecos((p) => ({ ...p, [i.id]: c }))}
+              />
+            </div>
+            {precos[i.id] !== i.precoEmbalagemCentavos && (
+              <p className="mt-1 text-xs text-marca-700">
+                estimativa era {formatarBRL(i.precoEmbalagemCentavos)}
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      <button
+        onClick={salvar}
+        disabled={salvando}
+        className="mt-5 h-14 w-full rounded-xl bg-marca-600 font-semibold text-white disabled:opacity-60"
+      >
+        {salvando ? 'Salvando…' : 'Confirmar e ver o custo'}
+      </button>
+      <button onClick={onPronto} disabled={salvando} className="mt-2 h-12 w-full rounded-xl text-slate-500">
+        Pular por enquanto
+      </button>
     </div>
   )
 }

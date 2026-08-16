@@ -1,4 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
+import { useEffect, useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router'
 import { montarCatalogo, paraConfigDominio } from '../db/catalogo'
 import { Comecar } from '../componentes/Comecar'
@@ -10,6 +11,16 @@ import { formatarBRL } from '../dominio/dinheiro'
 export function Fichas() {
   const navigate = useNavigate()
   const { sincronizado } = useOutletContext<ContextoApp>()
+
+  /**
+   * O onboarding NAO pode depender so de "banco vazio".
+   *
+   * Ele cria os proprios dados: ao semear os 57 insumos, a condicao que o
+   * mantinha na tela vira falsa, o componente desmonta no meio do fluxo e leva
+   * junto o estado da etapa de precos. Uma vez ativado, ele fica ate dizer que
+   * terminou.
+   */
+  const [comecarAtivo, setComecarAtivo] = useState(false)
 
   const dados = useLiveQuery(async () => {
     const [insumos, fichas, config] = await Promise.all([
@@ -51,6 +62,11 @@ export function Fichas() {
     navigate(`/fichas/${copia.id}`)
   }
 
+  const contaNova = !!dados && dados.fichas.length === 0 && dados.insumos.length === 0 && sincronizado
+  useEffect(() => {
+    if (contaNova) setComecarAtivo(true)
+  }, [contaNova])
+
   const carregando = !dados
   const catalogo = dados ? montarCatalogo(dados.insumos, dados.fichas) : null
   const config = paraConfigDominio(dados?.config)
@@ -66,11 +82,17 @@ export function Fichas() {
 
         {/* Conta nova (nada aqui NEM no servidor) -> onboarding.
             Dispositivo novo com dados no servidor -> espera o pull. */}
-        {dados && dados.fichas.length === 0 && dados.insumos.length === 0 && sincronizado && (
-          <Comecar onPronto={(fichaId) => (fichaId ? navigate(`/fichas/${fichaId}`) : criar())} />
+        {comecarAtivo && (
+          <Comecar
+            onPronto={(fichaId) => {
+              setComecarAtivo(false)
+              if (fichaId) navigate(`/fichas/${fichaId}`)
+              else criar()
+            }}
+          />
         )}
 
-        {dados && dados.fichas.length === 0 && !(dados.insumos.length === 0 && sincronizado) && (
+        {!comecarAtivo && dados && dados.fichas.length === 0 && (
           <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 text-center">
             <h2 className="text-lg font-semibold">Nenhuma ficha ainda</h2>
             <p className="mt-2 text-sm text-slate-600">
@@ -99,7 +121,7 @@ export function Fichas() {
         </ul>
       </div>
 
-      {dados && dados.fichas.length > 0 && (
+      {!comecarAtivo && dados && dados.fichas.length > 0 && (
         <div
           className="fixed inset-x-0 bottom-12 mx-auto max-w-md px-4 pt-6 pb-2"
           style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}

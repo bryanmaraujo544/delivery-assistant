@@ -47,7 +47,8 @@ Decisões e aprendizados vão em [APRENDIZADOS.md](APRENDIZADOS.md) — aqui fic
 - [x] Sincronização no cliente + tela de login + guarda de rota
 - [x] Host da API decidido: **Railway** (~US$ 5/mês) — config e build de produção prontos
 - [x] **Escopo da v1 completo** (núcleo de custo + UX anti-digitação)
-- [ ] Destravar boot em produção sem `RESEND_API_KEY` (senha não usa e-mail)
+- [x] Destravar boot em produção sem `RESEND_API_KEY`
+- [x] Preços do seed — resolvido perguntando no onboarding, não pesquisando
 - [ ] Deploy no Railway
 
 ---
@@ -432,6 +433,29 @@ já houve um sync bem-sucedido. Sem isso, quem entra num dispositivo novo veria
 por cima de uma conta que já tem fichas.
 
 **Escopo da v1 fechado.** Núcleo de custo e UX anti-digitação completos.
+
+### 2026-08-15 — Preços por confirmação, não por pesquisa
+
+**Tentei pesquisar preços reais e não deu.** O que a web oferece é promoção de
+uma rede, de um fim de semana, de uma região; um agregador chegou a dar
+"farinha 1 kg = R$ 17,95". A fonte oficial (DIEESE) é restrita e só tem o
+detalhe em PDF. Codificar isso trocaria número inventado por número
+*diferentemente errado*, agora com falsa autoridade.
+
+**Descoberta útil:** meus chutes estavam **40–70% acima** do real.
+
+**Solução:** o onboarding pergunta o preço dos **~6 insumos que a receita de
+exemplo usa**. É o preço dela, da região dela — melhor que qualquer média que
+eu conseguisse pesquisar.
+
+**Verificado rodando:** corrigir leite condensado de R$ 7,00 para R$ 4,99 no
+onboarding baixou o custo do brigadeiro de R$ 0,35 → **R$ 0,31** e o preço de
+R$ 0,87 → **R$ 0,76**. Recálculo em cascata funcionando desde o primeiro minuto.
+
+**Bug pego rodando:** o onboarding pulava a etapa de preços. Ele é renderizado
+quando o banco está vazio — e **se desmontava ao criar os próprios dados**,
+levando junto o estado da segunda etapa. Agora, uma vez ativado, fica até
+sinalizar que terminou.
 
 **Pendências abertas:**
 - Renomear o repositório: `delivery-assistant` não tem relação com o produto

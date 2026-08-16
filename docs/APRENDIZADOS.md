@@ -59,6 +59,27 @@ A pessoa abre o app, vê tela vazia pedindo 40 insumos, e desiste. **O valor só
 
 Verificado: existe oferta abundante de planilha **grátis e sem cadastro**; um app grátis foi elogiado justamente por **não exigir login**. Inferência (não comprovada): assinatura de R$ 15–45/mês compete com custo de insumo para quem fatura ~R$ 1.500/mês; a planilha é auditável e é dela para sempre; e ela **vem pronta**, enquanto o app chega vazio.
 
+### [2026-08-15] Preços do seed: perguntar venceu pesquisar
+
+**Tentativa:** levantar preços reais para os 57 insumos do catálogo semente, já que os meus eram chute.
+
+**Resultado da pesquisa:** inviável com confiança.
+- O que se acha é **promoção de uma rede, de um fim de semana, de uma região** (ex.: leite condensado R$ 4,99 e açúcar R$ 2,95 no Guanabara, 15–17/08/2026 — Rio).
+- Agregadores devolvem lixo com cara de dado: um resultado deu **"Farinha de trigo 1 kg — R$ 17,95"**.
+- A fonte oficial (DIEESE/Conab) tem o dado, mas a página é restrita e o detalhe por produto só está em PDF.
+
+**O que os números revelaram:** meus chutes estavam **40% a 70% acima** (leite condensado R$ 7,00 vs ~R$ 4,99; açúcar R$ 5,00 vs ~R$ 2,95).
+
+**Por que NÃO codifiquei os poucos preços encontrados:** trocaria número inventado por número *diferentemente errado*, agora carimbado como "pesquisado" — o que remove o sinal de desconfiança sem remover o erro. Preço regional e semanal não vira constante de código.
+
+**Decisão:** o onboarding **pergunta**. Depois de escolher o perfil, o app pede o preço dos **~6 insumos que a receita de exemplo usa** — não os 57. Vantagens sobre pesquisar:
+- é o preço **dela**, da região dela, da semana dela;
+- o custo fica real desde o primeiro minuto;
+- confirmar limpa o `precoEstimado`, então o badge "est." some só do que ela confirmou;
+- reaproveita o campo de dinheiro que já existe, e são 6 campos, não 57.
+
+Os demais insumos seguem estimados e marcados. A solução definitiva continua sendo **importar NF-e** — identificada no discovery como a maior brecha competitiva.
+
 ### [2026-08-15] Modelo de negócio decidido
 
 SaaS multi-tenant com assinatura. **Requisito explícito do Bryan:** suportar **contas isentas** — teste, parceiros, suporte, uso interno.
@@ -688,7 +709,7 @@ Não deixe o código depender disso sem verificar na fonte primária:
 - **Concorrentes não confirmados**: "Minha Confeitaria", "Maya", "Dora", "Jarbas", "Confeitaria Pro" apareceram em uma rodada de pesquisa e **não foram confirmados** em verificação independente. Um agente listou `minhaconfeitaria.com.br` como fonte — conflito não resolvido
 - **Hotmart/Eduzz/Kiwify**: preços de planilhas pagas (suposto concorrente nº1) — zero cobertura
 - **Reddit / grupos de Facebook**: evidência crua de usuárias — zero cobertura
-- **Preços do catálogo semente** (`src/db/seed-insumos.ts`) — os **tamanhos de embalagem** são convenção real do mercado BR (leite condensado 395 g, ovo em cartela de 30), mas os **preços são placeholders inventados**, não pesquisados. Todos entram com `precoEstimado: true`. Substituir por pesquisa de cesta antes de lançar
+- ~~Preços do catálogo semente~~ — **resolvido de outra forma em 15/08/2026.** Ver § A "Preços do seed: perguntar venceu pesquisar"
 - Densidades xícara→grama, custo de gás/kWh, depreciação de equipamento, atacado/consignado, ponto de equilíbrio
 
 ---
