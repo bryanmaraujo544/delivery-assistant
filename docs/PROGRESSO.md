@@ -378,6 +378,35 @@ nunca sai do app, então não quebra em PWA standalone no iOS.
 continua só com a lista explícita) — porta fixa fazia o CORS falhar de um jeito
 que parecia bug da aplicação.
 
+### 2026-08-15 — UX anti-digitação: parser + colar receita
+
+**Feito:**
+- `src/dominio/parser-ingrediente.ts` — léxico PT-BR + resolução contra o catálogo (23 testes)
+- Campo do picker virou **duplo**: `farinha` busca, `250g farinha` interpreta e oferece adicionar
+- `src/componentes/ColarReceita.tsx` — colar bloco de texto → revisão linha a linha → criação em lote
+
+**Verificado rodando, com receita real de WhatsApp:**
+```
+250g farinha de trigo                → Farinha de trigo · 250 g          [ok]
+200 g de açúcar refinado             → Açúcar refinado · 200 g           [ok]
+3 ovos                               → Ovo · 3 un                        [ok]
+1/2 xícara de óleo de soja           → "xícara" depende da densidade      [confira]
+1 lata de leite condensado           → 395 g · "1 lata = 395 g"          [ok]
+2 colheres de sopa de chocolate      → "colher" depende da densidade      [confira]
+50g de pistache                      → não está no catálogo               [novo]
+```
+Os 2 títulos ("Para a massa:", "Para a cobertura:") foram filtrados; só os 4
+resolvidos entram marcados. Depois de adicionar, o custo apareceu correto
+(farinha 250 g = R$ 1,50; açúcar 200 g = R$ 1,00).
+
+**A decisão que mais importa aqui é o que o parser NÃO faz.** Medida caseira
+não vira grama automaticamente: 1 xícara de farinha ≈ 120 g, de açúcar ≈ 200 g,
+de leite condensado ≈ 300 g. Converter sem densidade daria número errado com
+cara de certo — o pior tipo de erro num app de custo. Mesma regra para `ml` em
+insumo de massa e para termo ambíguo (devolve candidatos em vez de escolher).
+
+**Falta da v1:** onboarding de 1 pergunta.
+
 **Pendências abertas:**
 - Renomear o repositório: `delivery-assistant` não tem relação com o produto
 - Fechar as lacunas de [APRENDIZADOS.md § G](APRENDIZADOS.md#g-não-apurado--não-trate-como-fato), com prioridade para **MEI e rotulagem** antes de qualquer feature de etiqueta

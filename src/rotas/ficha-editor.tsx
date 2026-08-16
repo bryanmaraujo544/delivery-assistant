@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { BottomSheet } from '../componentes/BottomSheet'
+import { ColarReceita } from '../componentes/ColarReceita'
 import { CampoDinheiro } from '../componentes/CampoDinheiro'
 import { useSnackbar } from '../componentes/Snackbar'
 import { montarCatalogo, paraConfigDominio } from '../db/catalogo'
@@ -22,6 +23,7 @@ import {
   type ItemFicha,
   type MarkupBase,
 } from '../dominio/custo'
+import { parsearLinha, resolverLinha } from '../dominio/parser-ingrediente'
 import { formatarBRL } from '../dominio/dinheiro'
 
 const UNIDADES_RENDIMENTO = ['un', 'porcao', 'fatia', 'cento', 'g', 'kg']
@@ -42,6 +44,7 @@ export function FichaEditor() {
   const navigate = useNavigate()
   const { mostrar, elemento: snackbar } = useSnackbar()
   const [pickerAberto, setPickerAberto] = useState(false)
+  const [colarAberto, setColarAberto] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [canal, setCanal] = useState(CANAIS[0]!)
 
@@ -285,6 +288,26 @@ export function FichaEditor() {
         fichasBase={dados.fichas.filter((f) => f.ehBase && f.id !== ficha.id)}
         contexto={ficha.categoria ?? 'global'}
         onEscolher={adicionarItem}
+        onColarReceita={() => {
+          setPickerAberto(false)
+          setColarAberto(true)
+        }}
+      />
+
+      <ColarReceita
+        aberto={colarAberto}
+        onFechar={() => setColarAberto(false)}
+        insumos={dados.insumos}
+        onConfirmar={async (itens, novos) => {
+          // insumos novos primeiro: os itens da ficha referenciam os ids deles
+          if (novos.length > 0) await db.insumos.bulkPut(novos)
+          await patch({ itens: [...ficha.itens, ...itens] })
+          for (const it of itens) {
+            if (it.tipo === 'insumo') await registrarUso(it.insumoId, 'global')
+          }
+          setColarAberto(false)
+          mostrar(`${itens.length} ${itens.length === 1 ? 'ingrediente adicionado' : 'ingredientes adicionados'}`)
+        }}
       />
 
       {snackbar}
@@ -460,6 +483,7 @@ function PickerItem({
   fichasBase,
   contexto,
   onEscolher,
+  onColarReceita,
 }: {
   aberto: boolean
   onFechar: () => void
@@ -467,6 +491,7 @@ function PickerItem({
   fichasBase: FichaLocal[]
   contexto: string
   onEscolher: (item: ItemFicha) => void
+  onColarReceita: () => void
 }) {
   const [busca, setBusca] = useState('')
   const [ranking, setRanking] = useState<string[]>([])
@@ -487,6 +512,21 @@ function PickerItem({
   const filtrados = busca
     ? insumos.filter((i) => i.nomeNormalizado.includes(buscaNorm)).slice(0, 30)
     : insumos.slice(0, 30)
+
+  /**
+   * O MESMO campo serve para buscar e para escrever a linha inteira.
+   *
+   * "farinha" filtra a lista; "250g farinha" reconhece quantidade e unidade e
+   * oferece adicionar direto. Dois campos separados obrigariam a usuária a
+   * decidir antes de digitar qual dos dois usar — decisão que ela não deveria
+   * precisar tomar.
+   */
+  const interpretado = useMemo(() => {
+    const t = busca.trim()
+    if (!t) return null
+    const r = resolverLinha(parsearLinha(t), insumos)
+    return r.status === 'pronto' && r.quantidade != null ? r : null
+  }, [busca, insumos])
 
   return (
     <BottomSheet aberto={aberto} titulo="Adicionar ingrediente" onFechar={onFechar}>
@@ -520,10 +560,45 @@ function PickerItem({
       <input
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
-        placeholder="Buscar"
-        aria-label="Buscar ingrediente"
+        placeholder='Buscar ou escrever "250g farinha"'
+        aria-label="Buscar ou escrever ingrediente"
         className="h-12 w-full rounded-xl border border-slate-300 px-4 focus:border-marca-600 focus:outline-none"
       />
+
+      {/* Feedback de parse em tempo real: sem ver o que foi entendido, o campo
+          de linguagem natural vira ansiedade em vez de velocidade. */}
+      {interpretado && (
+        <button
+          onClick={() => {
+            onEscolher({
+              tipo: 'insumo',
+              insumoId: interpretado.insumo!.id,
+              quantidade: interpretado.quantidade!,
+              unidade: interpretado.unidade!,
+            })
+            setBusca('')
+          }}
+          className="mt-2 flex w-full items-center gap-3 rounded-xl border-2 border-marca-500
+                     bg-marca-50 px-4 py-3 text-left"
+        >
+          <span className="text-lg">+</span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-medium text-marca-700">{interpretado.insumo!.nome}</span>
+            <span className="block text-sm text-slate-600">
+              {interpretado.quantidade} {interpretado.unidade}
+              {interpretado.aviso && ` · ${interpretado.aviso}`}
+            </span>
+          </span>
+        </button>
+      )}
+
+      <button
+        onClick={onColarReceita}
+        className="mt-3 h-11 w-full rounded-xl border border-dashed border-slate-300 text-sm
+                   font-medium text-slate-600"
+      >
+        Colar receita inteira
+      </button>
 
       {fichasBase.length > 0 && !busca && (
         <div className="mt-4">
