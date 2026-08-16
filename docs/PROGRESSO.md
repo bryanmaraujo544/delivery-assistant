@@ -46,7 +46,9 @@ Decisões e aprendizados vão em [APRENDIZADOS.md](APRENDIZADOS.md) — aqui fic
 - [x] Endpoints de sincronização (push/pull) com LWW e isolamento por tenant
 - [x] Sincronização no cliente + tela de login + guarda de rota
 - [x] Host da API decidido: **Railway** (~US$ 5/mês) — config e build de produção prontos
-- [ ] Deploy de fato (depende da chave do Resend e das variáveis no Railway)
+- [x] **Escopo da v1 completo** (núcleo de custo + UX anti-digitação)
+- [ ] Destravar boot em produção sem `RESEND_API_KEY` (senha não usa e-mail)
+- [ ] Deploy no Railway
 
 ---
 
@@ -405,7 +407,31 @@ de leite condensado ≈ 300 g. Converter sem densidade daria número errado com
 cara de certo — o pior tipo de erro num app de custo. Mesma regra para `ml` em
 insumo de massa e para termo ambíguo (devolve candidatos em vez de escolher).
 
-**Falta da v1:** onboarding de 1 pergunta.
+### 2026-08-15 — Onboarding de 1 pergunta (fecha a UX da v1)
+
+**Feito:**
+- `src/componentes/Comecar.tsx` — uma pergunta ("O que você mais faz?"), três
+  perfis, e uma receita de exemplo montada com insumos reais do catálogo
+- Aparece só quando **não há nada local NEM no servidor**
+
+**Verificado rodando — conta nova cai direto numa ficha com custo pronto:**
+```
+Total do lote   R$ 17,30
+÷ 50 un         R$  0,35
+Preço R$ 0,87 · Margem 60,2% · CMV 39,8%
+```
+
+**Bug pego rodando:** o onboarding não aparecia. `jaSincronizou()` era lido em
+tempo de render, mas numa conta nova o servidor não devolve nada, o Dexie não
+muda, e nada dispara re-render — a tela ficava presa no estado anterior. Virou
+**estado** no `Guardiao`, propagado por contexto do roteador.
+
+**Cuidado deliberado:** o onboarding só aparece se o banco local está vazio **e**
+já houve um sync bem-sucedido. Sem isso, quem entra num dispositivo novo veria
+"o que você mais faz?" antes do pull chegar — e responder criaria dado duplicado
+por cima de uma conta que já tem fichas.
+
+**Escopo da v1 fechado.** Núcleo de custo e UX anti-digitação completos.
 
 **Pendências abertas:**
 - Renomear o repositório: `delivery-assistant` não tem relação com o produto

@@ -1,12 +1,15 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useNavigate } from 'react-router'
+import { useNavigate, useOutletContext } from 'react-router'
 import { montarCatalogo, paraConfigDominio } from '../db/catalogo'
+import { Comecar } from '../componentes/Comecar'
 import { db, type FichaLocal } from '../db/local'
+import type { ContextoApp } from '../componentes/Guardiao'
 import { calcularCustoFicha, calcularPreco } from '../dominio/custo'
 import { formatarBRL } from '../dominio/dinheiro'
 
 export function Fichas() {
   const navigate = useNavigate()
+  const { sincronizado } = useOutletContext<ContextoApp>()
 
   const dados = useLiveQuery(async () => {
     const [insumos, fichas, config] = await Promise.all([
@@ -61,7 +64,13 @@ export function Fichas() {
       <div className="flex-1 px-4">
         {carregando && <p className="py-10 text-center text-slate-400">Carregando…</p>}
 
-        {dados && dados.fichas.length === 0 && (
+        {/* Conta nova (nada aqui NEM no servidor) -> onboarding.
+            Dispositivo novo com dados no servidor -> espera o pull. */}
+        {dados && dados.fichas.length === 0 && dados.insumos.length === 0 && sincronizado && (
+          <Comecar onPronto={(fichaId) => (fichaId ? navigate(`/fichas/${fichaId}`) : criar())} />
+        )}
+
+        {dados && dados.fichas.length === 0 && !(dados.insumos.length === 0 && sincronizado) && (
           <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 text-center">
             <h2 className="text-lg font-semibold">Nenhuma ficha ainda</h2>
             <p className="mt-2 text-sm text-slate-600">

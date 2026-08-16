@@ -25,6 +25,16 @@ const gravarUltimoSync = (t: number) => localStorage.setItem(CHAVE_ULTIMO, Strin
 
 export type EstadoSync = 'ocioso' | 'sincronizando' | 'offline' | 'erro'
 
+/**
+ * Ja houve pelo menos uma sincronizacao bem-sucedida?
+ *
+ * Existe para o onboarding nao aparecer no lugar errado: banco local vazio
+ * pode significar "conta nova" OU "dispositivo novo, o pull ainda nao chegou".
+ * Mostrar "o que voce mais faz?" para quem ja tem 40 fichas no servidor seria
+ * assustador — e aceitar a resposta criaria dado duplicado.
+ */
+export const jaSincronizou = () => lerUltimoSync() > 0
+
 /** Só o que mudou desde a última sincronização bem-sucedida. */
 async function coletarPendentes(desde: number) {
   const [insumos, fichas, config] = await Promise.all([

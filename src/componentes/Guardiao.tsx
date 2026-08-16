@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Outlet } from 'react-router'
 import { lerSessao, limparSessao } from '../auth/sessao'
-import { iniciarSyncAutomatico, type EstadoSync } from '../db/sync'
+import { iniciarSyncAutomatico, jaSincronizou, type EstadoSync } from '../db/sync'
 import { NavInferior } from './NavInferior'
 
 /**
@@ -11,13 +11,29 @@ import { NavInferior } from './NavInferior'
  * os dados; a rede é melhoria, não pré-requisito. Bloquear a tela esperando o
  * servidor quebraria justamente o caso de uso (cozinha, Wi-Fi ruim).
  */
+/** O que as telas filhas precisam saber sobre a sincronizacao. */
+export interface ContextoApp {
+  /**
+   * Ja houve ao menos um sync bem-sucedido.
+   *
+   * Precisa ser ESTADO, nao leitura de localStorage em tempo de render: numa
+   * conta nova o servidor nao devolve nada, o Dexie nao muda, e nada
+   * dispararia um re-render — a tela ficaria presa no estado anterior.
+   */
+  sincronizado: boolean
+}
+
 export function Guardiao() {
   const [estado, setEstado] = useState<EstadoSync>('ocioso')
+  const [sincronizado, setSincronizado] = useState(jaSincronizou())
   const sessao = lerSessao()
 
   useEffect(() => {
     if (!sessao) return
-    return iniciarSyncAutomatico(setEstado)
+    return iniciarSyncAutomatico((e) => {
+      setEstado(e)
+      setSincronizado(jaSincronizou())
+    })
   }, [sessao?.token])
 
   if (!sessao) return <Navigate to="/login" replace />
@@ -25,7 +41,7 @@ export function Guardiao() {
   return (
     <>
       <IndicadorSync estado={estado} />
-      <Outlet />
+      <Outlet context={{ sincronizado } satisfies ContextoApp} />
       <NavInferior
         onSair={() => {
           limparSessao()
