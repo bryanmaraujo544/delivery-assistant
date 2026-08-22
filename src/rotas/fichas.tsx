@@ -5,7 +5,7 @@ import { montarCatalogo, paraConfigDominio } from '../db/catalogo'
 import { Comecar } from '../componentes/Comecar'
 import { db, type FichaLocal } from '../db/local'
 import type { ContextoApp } from '../componentes/Guardiao'
-import { calcularCustoFicha, calcularPreco } from '../dominio/custo'
+import { aplicarTaxaDeCanal, calcularCustoFicha, calcularPreco } from '../dominio/custo'
 import { formatarBRL } from '../dominio/dinheiro'
 
 export function Fichas() {
@@ -42,6 +42,7 @@ export function Fichas() {
       perdas: [],
       markupBase: 'materiais',
       markupMultiplicador: 2.5,
+      canalTaxaPercentual: 0,
       atualizadoEm: Date.now(),
       excluidoEm: null,
     }
@@ -157,10 +158,15 @@ function LinhaFicha({
   try {
     const c = calcularCustoFicha(ficha.id, catalogo, config)
     custoUnit = c.custoUnitario
-    preco = calcularPreco(c, {
-      base: ficha.markupBase,
-      multiplicador: ficha.markupMultiplicador,
-    }).precoUnitario
+    // a lista precisa mostrar o MESMO numero que a ficha mostrou. Ignorar o
+    // canal aqui faria a usuaria ver um preco na ficha e outro na listagem.
+    preco = aplicarTaxaDeCanal(
+      calcularPreco(c, {
+        base: ficha.markupBase,
+        multiplicador: ficha.markupMultiplicador,
+      }).precoUnitario,
+      ficha.canalTaxaPercentual ?? 0,
+    )
   } catch {
     // ficha incompleta ou com ciclo — a lista nao e o lugar de gritar erro
   }

@@ -155,6 +155,7 @@ export function Comecar({ onPronto }: Props) {
       perdas: [],
       markupBase: 'materiais',
       markupMultiplicador: 2.5,
+      canalTaxaPercentual: 0,
       atualizadoEm: Date.now(),
       excluidoEm: null,
     }))

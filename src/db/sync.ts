@@ -164,6 +164,7 @@ const paraEnvioFicha = (f: FichaLocal) => ({
   perdas: f.perdas,
   markupBase: f.markupBase,
   markupMultiplicador: f.markupMultiplicador,
+  canalTaxaPercentual: f.canalTaxaPercentual ?? 0,
   atualizadoEm: f.atualizadoEm,
   excluidoEm: f.excluidoEm ?? null,
 })

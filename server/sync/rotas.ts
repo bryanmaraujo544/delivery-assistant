@@ -135,6 +135,7 @@ export async function registrarRotasSync(app: FastifyInstance) {
         perdas: perdas
           .filter((p) => p.fichaId === f.id)
           .map((p) => ({ tipo: p.tipo, percentual: num(p.percentual)! })),
+        canalTaxaPercentual: num(f.canalTaxaPercentual) ?? 0,
         markupBase: precos.find((p) => p.fichaId === f.id)?.base ?? ('materiais' as const),
         markupMultiplicador: num(precos.find((p) => p.fichaId === f.id)?.multiplicador ?? '2.5')!,
         atualizadoEm: f.atualizadoEm.getTime(),
@@ -197,6 +198,7 @@ async function gravarFicha(tx: Tx, tenantId: string, f: FichaSync) {
     unidadeRendimento: f.unidadeRendimento,
     tempoPreparoMin: f.tempoPreparoMin ?? null,
     ehBase: f.ehBase,
+    canalTaxaPercentual: String(f.canalTaxaPercentual ?? 0),
     atualizadoEm: new Date(f.atualizadoEm),
     excluidoEm: f.excluidoEm ? new Date(f.excluidoEm) : null,
   }

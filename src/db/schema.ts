@@ -251,6 +251,10 @@ export const fichaTecnica = pgTable(
     tempoPreparoMin: integer('tempo_preparo_min'),
     /** massa branca, ganache, brigadeiro de corte — templates de 1a classe */
     ehBase: boolean('eh_base').notNull().default(false),
+    /** taxa do canal escolhido, em % — 0 = venda direta */
+    canalTaxaPercentual: numeric('canal_taxa_percentual', { precision: 6, scale: 3 })
+      .notNull()
+      .default('0'),
 
     criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
     atualizadoEm: timestamp('atualizado_em', { withTimezone: true }).notNull().defaultNow(),
@@ -260,6 +264,8 @@ export const fichaTecnica = pgTable(
     index('ficha_tenant_idx').on(t.tenantId),
     check('ficha_rendimento_positivo', sql`rendimento_teorico > 0`),
     check('ficha_rendimento_real_positivo', sql`rendimento_real IS NULL OR rendimento_real > 0`),
+    // >= 100% tornaria a divisao (1 - taxa) zero ou negativa
+    check('ficha_canal_taxa_faixa', sql`canal_taxa_percentual >= 0 AND canal_taxa_percentual < 100`),
   ],
 )
 

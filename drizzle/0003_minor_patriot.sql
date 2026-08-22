@@ -1,0 +1,2 @@
+ALTER TABLE "ficha_tecnica" ADD COLUMN "canal_taxa_percentual" numeric(6, 3) DEFAULT '0' NOT NULL;--> statement-breakpoint
+ALTER TABLE "ficha_tecnica" ADD CONSTRAINT "ficha_canal_taxa_faixa" CHECK (canal_taxa_percentual >= 0 AND canal_taxa_percentual < 100);

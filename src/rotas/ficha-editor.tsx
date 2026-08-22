@@ -46,7 +46,6 @@ export function FichaEditor() {
   const [pickerAberto, setPickerAberto] = useState(false)
   const [colarAberto, setColarAberto] = useState(false)
   const [salvando, setSalvando] = useState(false)
-  const [canal, setCanal] = useState(CANAIS[0]!)
 
   const dados = useLiveQuery(async () => {
     const [ficha, insumos, fichas, config] = await Promise.all([
@@ -284,8 +283,8 @@ export function FichaEditor() {
             custo={resultado.custo}
             preco={resultado.preco!}
             ficha={ficha}
-            canal={canal}
-            onCanal={setCanal}
+            canal={CANAIS.find((c) => c.taxa === ficha.canalTaxaPercentual) ?? CANAIS[0]!}
+            onCanal={(c) => patch({ canalTaxaPercentual: c.taxa })}
             onMarkup={(base, mult) => patch({ markupBase: base, markupMultiplicador: mult })}
           />
         )}
@@ -553,33 +552,10 @@ function PickerItem({
 
   return (
     <BottomSheet aberto={aberto} titulo="Adicionar ingrediente" onFechar={onFechar}>
-      {frequentes.length > 0 && !busca && (
-        <div className="mb-4">
-          <p className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-            Você usa sempre
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {frequentes.map((i) => (
-              <button
-                key={i.id}
-                onClick={() =>
-                  onEscolher({
-                    tipo: 'insumo',
-                    insumoId: i.id,
-                    quantidade: 1,
-                    unidade: unidadePadrao(i),
-                  })
-                }
-                className="h-11 rounded-full bg-marca-50 px-4 text-sm font-medium text-marca-700
-                           ring-1 ring-marca-500/30"
-              >
-                {i.nome}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
+      {/* A BUSCA FICA NO TOPO, sempre.
+          Quando o teclado do celular abre, ele come a metade de baixo da tela.
+          Com o campo embaixo dos chips, os resultados nasciam atras do teclado
+          e a pessoa digitava sem ver o que estava achando. */}
       <input
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
@@ -613,6 +589,33 @@ function PickerItem({
             </span>
           </span>
         </button>
+      )}
+
+      {frequentes.length > 0 && !busca && (
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+            Você usa sempre
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {frequentes.map((i) => (
+              <button
+                key={i.id}
+                onClick={() =>
+                  onEscolher({
+                    tipo: 'insumo',
+                    insumoId: i.id,
+                    quantidade: 1,
+                    unidade: unidadePadrao(i),
+                  })
+                }
+                className="h-11 rounded-full bg-marca-50 px-4 text-sm font-medium text-marca-700
+                           ring-1 ring-marca-500/30"
+              >
+                {i.nome}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       <button

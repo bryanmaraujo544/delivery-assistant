@@ -68,6 +68,14 @@ export interface FichaLocal {
   perdas: { tipo: TipoPerda; percentual: number }[]
   markupBase: MarkupBase
   markupMultiplicador: number
+  /**
+   * Taxa do canal escolhido, em %. 0 = venda direta.
+   *
+   * Fica NA FICHA, nao em estado de tela: a usuaria escolhe "iFood Basico" e
+   * espera que a lista mostre aquele preco. Sem persistir, a escolha some ao
+   * sair da tela e o numero que ela viu nao existe em lugar nenhum.
+   */
+  canalTaxaPercentual: number
   atualizadoEm: number
   excluidoEm?: number | null
 }
@@ -148,6 +156,30 @@ db.version(3)
       await tx.table('usoInsumos').delete(u.id)
       await tx.table('usoInsumos').put({ ...u, id: `${novo}::${u.contexto}`, insumoId: novo })
     }
+  })
+
+/**
+ * v4 — `canalTaxaPercentual` nas fichas existentes.
+ *
+ * O canal era estado de tela e nao era gravado: a usuaria escolhia "iFood
+ * Basico", via o preco ajustado, saia da ficha e a escolha sumia. Agora e campo
+ * da ficha, e as que ja existem precisam do default 0 (venda direta) — sem isso
+ * o calculo receberia undefined e o preco sairia NaN.
+ */
+db.version(4)
+  .stores({
+    insumos: 'id, nomeNormalizado, categoria, excluidoEm',
+    usoInsumos: 'id, insumoId, contexto',
+    fichas: 'id, nome, categoria, ehBase, excluidoEm',
+    config: 'id',
+  })
+  .upgrade(async (tx) => {
+    await tx
+      .table<FichaLocal>('fichas')
+      .toCollection()
+      .modify((f) => {
+        if (typeof f.canalTaxaPercentual !== 'number') f.canalTaxaPercentual = 0
+      })
   })
 
 export const CONFIG_PADRAO: ConfigLocal = {

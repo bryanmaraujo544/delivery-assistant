@@ -63,6 +63,7 @@ export const zFicha = z.object({
   perdas: z.array(zPerda).max(10),
   markupBase: z.enum(['materiais', 'custo_total']),
   markupMultiplicador: z.number().positive(),
+  canalTaxaPercentual: z.number().min(0).max(99.999).default(0),
   atualizadoEm: z.number().int(),
   excluidoEm: z.number().int().nullish(),
 })
