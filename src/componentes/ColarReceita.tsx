@@ -91,6 +91,7 @@ export function ColarReceita({ aberto, onFechar, insumos, onConfirmar }: Props) 
           fatorCorrecao: 1,
           precoEstimado: true,
           origemSeed: false,
+          favorito: false,
           atualizadoEm: Date.now(),
           excluidoEm: null,
         }

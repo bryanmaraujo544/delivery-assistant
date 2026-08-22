@@ -102,6 +102,7 @@ export async function registrarRotasSync(app: FastifyInstance) {
         fatorCorrecao: num(i.fatorCorrecao)!,
         precoEstimado: i.precoEstimado,
         origemSeed: i.origemSeed,
+        favorito: i.favorito,
         atualizadoEm: i.atualizadoEm.getTime(),
         excluidoEm: i.excluidoEm?.getTime() ?? null,
       })),
@@ -171,6 +172,7 @@ async function gravarInsumo(tx: Tx, tenantId: string, i: InsumoSync) {
     fatorCorrecao: String(i.fatorCorrecao),
     precoEstimado: i.precoEstimado,
     origemSeed: i.origemSeed,
+    favorito: i.favorito ?? false,
     atualizadoEm: new Date(i.atualizadoEm),
     excluidoEm: i.excluidoEm ? new Date(i.excluidoEm) : null,
   }

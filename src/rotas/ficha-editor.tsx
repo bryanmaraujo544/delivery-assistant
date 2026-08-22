@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router'
 import { BottomSheet } from '../componentes/BottomSheet'
 import { ColarReceita } from '../componentes/ColarReceita'
 import { CampoDinheiro } from '../componentes/CampoDinheiro'
-import { useSnackbar } from '../componentes/Snackbar'
+import { mostrarAviso } from '../componentes/Snackbar'
 import { montarCatalogo, paraConfigDominio } from '../db/catalogo'
 import { rankearInsumos, registrarUso } from '../db/frecency'
 import {
@@ -42,7 +42,6 @@ const CANAIS = [
 export function FichaEditor() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
-  const { mostrar, elemento: snackbar } = useSnackbar()
   const [pickerAberto, setPickerAberto] = useState(false)
   const [colarAberto, setColarAberto] = useState(false)
   const [salvando, setSalvando] = useState(false)
@@ -80,6 +79,36 @@ export function FichaEditor() {
     setPickerAberto(false)
   }
 
+  /** Duplicar e caminho primario: confeitaria e variacao sobre base. */
+  async function duplicar() {
+    if (!ficha) return
+    const copia: FichaLocal = {
+      ...ficha,
+      id: crypto.randomUUID(),
+      nome: `${ficha.nome} (cópia)`,
+      atualizadoEm: Date.now(),
+    }
+    await db.fichas.put(copia)
+    navigate(`/fichas/${copia.id}`)
+  }
+
+  /**
+   * Soft delete + desfazer, igual aos insumos.
+   *
+   * Sem confirmacao modal: a ficha nao some do banco, so ganha `excluidoEm`, e
+   * o snackbar devolve. Confirmacao e proporcional ao custo de RECONSTRUIR, e
+   * aqui reconstruir custa um toque.
+   */
+  async function excluir() {
+    if (!ficha) return
+    await db.fichas.update(ficha.id, { excluidoEm: Date.now(), atualizadoEm: Date.now() })
+    navigate('/fichas')
+    mostrarAviso(`"${ficha.nome}" excluída`, async () => {
+      await db.fichas.update(ficha.id, { excluidoEm: null, atualizadoEm: Date.now() })
+      navigate(`/fichas/${ficha.id}`)
+    })
+  }
+
   async function removerItem(indice: number) {
     if (!ficha) return
     const removido = ficha.itens[indice]!
@@ -89,7 +118,7 @@ export function FichaEditor() {
       removido.tipo === 'insumo'
         ? (dados?.insumos.find((i) => i.id === removido.insumoId)?.nome ?? 'Item')
         : (dados?.fichas.find((f) => f.id === removido.fichaId)?.nome ?? 'Receita')
-    mostrar(`"${nome}" removido`, () => patch({ itens: anterior }))
+    mostrarAviso(`"${nome}" removido`, () => patch({ itens: anterior }))
   }
 
   const catalogo = useMemo(
@@ -278,6 +307,27 @@ export function FichaEditor() {
           <div className="rounded-xl bg-red-50 p-4 text-sm text-red-800">{resultado.erro}</div>
         )}
 
+        <Secao titulo="Esta ficha">
+          <div className="flex gap-2">
+            <button
+              onClick={duplicar}
+              className="h-12 flex-1 rounded-xl border border-slate-300 font-medium text-slate-700"
+            >
+              Duplicar
+            </button>
+            <button
+              onClick={excluir}
+              className="h-12 flex-1 rounded-xl border border-red-200 font-medium text-red-600"
+            >
+              Excluir
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            Duplicar é o caminho mais rápido para uma variação — bolo de chocolate vira bolo de
+            chocolate com nozes sem remontar nada.
+          </p>
+        </Secao>
+
         {resultado?.custo && (
           <PainelCusto
             custo={resultado.custo}
@@ -315,11 +365,10 @@ export function FichaEditor() {
             if (it.tipo === 'insumo') await registrarUso(it.insumoId, 'global')
           }
           setColarAberto(false)
-          mostrar(`${itens.length} ${itens.length === 1 ? 'ingrediente adicionado' : 'ingredientes adicionados'}`)
+          mostrarAviso(`${itens.length} ${itens.length === 1 ? 'ingrediente adicionado' : 'ingredientes adicionados'}`)
         }}
       />
 
-      {snackbar}
     </main>
   )
 }
@@ -531,9 +580,15 @@ function PickerItem({
     .slice(0, 8)
 
   const buscaNorm = normalizar(busca)
+  // favorito no topo aqui tambem: nao adianta favoritar se so vale numa tela
+  const ordenados = [...insumos].sort(
+    (a, b) =>
+      Number(b.favorito ?? false) - Number(a.favorito ?? false) ||
+      a.nome.localeCompare(b.nome, 'pt-BR'),
+  )
   const filtrados = busca
-    ? insumos.filter((i) => i.nomeNormalizado.includes(buscaNorm)).slice(0, 30)
-    : insumos.slice(0, 30)
+    ? ordenados.filter((i) => i.nomeNormalizado.includes(buscaNorm)).slice(0, 30)
+    : ordenados.slice(0, 30)
 
   /**
    * O MESMO campo serve para buscar e para escrever a linha inteira.
@@ -662,6 +717,7 @@ function PickerItem({
               }
               className="w-full px-4 py-3 text-left"
             >
+              {i.favorito && <span className="mr-1 text-marca-600" aria-label="favorito">★</span>}
               <span className="font-medium text-slate-900">{i.nome}</span>
               <span className="ml-2 text-sm text-slate-500">{i.categoria}</span>
             </button>

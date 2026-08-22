@@ -1,0 +1,1 @@
+ALTER TABLE "insumo" ADD COLUMN "favorito" boolean DEFAULT false NOT NULL;

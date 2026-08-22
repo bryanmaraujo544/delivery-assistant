@@ -35,6 +35,17 @@ export type EstadoSync = 'ocioso' | 'sincronizando' | 'offline' | 'erro'
  */
 export const jaSincronizou = () => lerUltimoSync() > 0
 
+/**
+ * Conta criada agora neste dispositivo.
+ *
+ * Complementa `jaSincronizou`: banco local vazio pode ser "conta nova" OU
+ * "dispositivo novo esperando o pull". Depender so do sync deixava a usuaria
+ * sem onboarding quando a API estava fora do ar — e foi exatamente o que
+ * aconteceu quando uma migration ficou pendente.
+ */
+export const ehContaNova = () => localStorage.getItem('precifica.contaNova') === '1'
+export const esquecerContaNova = () => localStorage.removeItem('precifica.contaNova')
+
 /** Só o que mudou desde a última sincronização bem-sucedida. */
 async function coletarPendentes(desde: number) {
   const [insumos, fichas, config] = await Promise.all([
@@ -147,6 +158,7 @@ const paraEnvioInsumo = (i: InsumoLocal) => ({
   fatorCorrecao: i.fatorCorrecao,
   precoEstimado: i.precoEstimado,
   origemSeed: i.origemSeed,
+  favorito: i.favorito ?? false,
   atualizadoEm: i.atualizadoEm,
   excluidoEm: i.excluidoEm ?? null,
 })

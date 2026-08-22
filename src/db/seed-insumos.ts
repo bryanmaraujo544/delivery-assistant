@@ -134,6 +134,7 @@ export function construirSeed(agora = Date.now()): InsumoLocal[] {
       fatorCorrecao: s.fc ?? 1,
       precoEstimado: true,
       origemSeed: true,
+      favorito: false,
       atualizadoEm: agora,
       excluidoEm: null,
     }

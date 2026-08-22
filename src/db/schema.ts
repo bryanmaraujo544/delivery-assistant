@@ -179,6 +179,8 @@ export const insumo = pgTable(
     /** preco veio do catalogo semente e ainda nao foi confirmado pela usuaria */
     precoEstimado: boolean('preco_estimado').notNull().default(false),
     origemSeed: boolean('origem_seed').notNull().default(false),
+    /** marcado pela usuaria: sobe para o topo das listas */
+    favorito: boolean('favorito').notNull().default(false),
 
     /**
      * DERIVADO — nunca digitado (checklist NN/g: compute o que der para computar).

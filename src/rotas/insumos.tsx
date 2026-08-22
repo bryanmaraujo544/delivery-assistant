@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { BottomSheet } from '../componentes/BottomSheet'
 import { CampoDinheiro } from '../componentes/CampoDinheiro'
-import { useSnackbar } from '../componentes/Snackbar'
+import { mostrarAviso } from '../componentes/Snackbar'
 import {
   UNIDADES,
   custoExibicao,
@@ -23,6 +23,7 @@ const rascunhoVazio = {
   embalagemUnidade: 'kg',
   precoEmbalagemCentavos: 0,
   fatorCorrecao: '1',
+  favorito: false,
 }
 type Rascunho = typeof rascunhoVazio
 
@@ -35,7 +36,6 @@ export function Insumos() {
   const [editando, setEditando] = useState<InsumoLocal | null>(null)
   const [sheetAberto, setSheetAberto] = useState(false)
   const [rascunho, setRascunho] = useState<Rascunho>(rascunhoVazio)
-  const { mostrar, elemento: snackbar } = useSnackbar()
 
   const insumos = useLiveQuery(
     () => db.insumos.filter((i) => !i.excluidoEm).toArray(),
@@ -45,8 +45,15 @@ export function Insumos() {
   const buscaNorm = normalizar(busca)
   const filtrados = useMemo(() => {
     const lista = (insumos ?? []).filter((i) => i.nomeNormalizado.includes(buscaNorm))
-    return lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    // favorito primeiro, depois alfabetico
+    return lista.sort(
+      (a, b) =>
+        Number(b.favorito ?? false) - Number(a.favorito ?? false) ||
+        a.nome.localeCompare(b.nome, 'pt-BR'),
+    )
   }, [insumos, buscaNorm])
+
+  const favoritos = useMemo(() => filtrados.filter((i) => i.favorito), [filtrados])
 
   const agrupados = useMemo(() => {
     const mapa = new Map<string, InsumoLocal[]>()
@@ -79,6 +86,7 @@ export function Insumos() {
       embalagemUnidade: i.embalagemUnidade,
       precoEmbalagemCentavos: i.precoEmbalagemCentavos,
       fatorCorrecao: String(i.fatorCorrecao),
+      favorito: i.favorito ?? false,
     })
     setSheetAberto(true)
   }
@@ -103,11 +111,12 @@ export function Insumos() {
       // editar o preco confirma o valor: deixa de ser estimativa do seed
       precoEstimado: editando ? false : false,
       origemSeed: editando?.origemSeed ?? false,
+      favorito: rascunho.favorito,
       atualizadoEm: Date.now(),
       excluidoEm: null,
     }
     await db.insumos.put(registro)
-    mostrar(editando ? 'Insumo atualizado' : `"${registro.nome}" adicionado`)
+    mostrarAviso(editando ? 'Insumo atualizado' : `"${registro.nome}" adicionado`)
     fecharSheet()
   }
 
@@ -115,14 +124,14 @@ export function Insumos() {
   async function excluir(i: InsumoLocal) {
     await db.insumos.update(i.id, { excluidoEm: Date.now() })
     setSheetAberto(false)
-    mostrar(`"${i.nome}" removido`, async () => {
+    mostrarAviso(`"${i.nome}" removido`, async () => {
       await db.insumos.update(i.id, { excluidoEm: null })
     })
   }
 
   async function aplicarSeed() {
     await db.insumos.bulkPut(construirSeed())
-    mostrar('Catálogo inicial carregado. Confirme os preços conforme comprar.')
+    mostrarAviso('Catálogo inicial carregado. Confirme os preços conforme comprar.')
   }
 
   /**
@@ -172,6 +181,21 @@ export function Insumos() {
         {carregando && <p className="py-10 text-center text-slate-400">Carregando…</p>}
 
         {vazio && <EstadoVazio onCarregarSeed={aplicarSeed} onCriar={() => abrirNovo()} />}
+
+        {/* Favoritos ficam FORA das categorias, no topo: o ponto de favoritar
+            e nao precisar lembrar em que categoria o insumo esta. */}
+        {!vazio && favoritos.length > 0 && (
+          <section className="mt-5">
+            <h2 className="px-1 pb-2 text-xs font-semibold tracking-wide text-marca-700 uppercase">
+              ★ Favoritos
+            </h2>
+            <ul className="overflow-hidden rounded-xl border border-marca-500/40 bg-white">
+              {favoritos.map((i) => (
+                <LinhaInsumo key={i.id} insumo={i} onClick={() => abrirEdicao(i)} />
+              ))}
+            </ul>
+          </section>
+        )}
 
         {!vazio &&
           agrupados.map(([categoria, itens]) => (
@@ -229,7 +253,6 @@ export function Insumos() {
         }}
       />
 
-      {snackbar}
     </main>
   )
 }
@@ -355,6 +378,19 @@ function SheetInsumo({
       }
     >
       <div className="space-y-5">
+        <button
+          onClick={() => set('favorito', !rascunho.favorito)}
+          aria-pressed={rascunho.favorito}
+          className={`flex h-12 w-full items-center gap-2 rounded-xl border px-4 text-left font-medium ${
+            rascunho.favorito
+              ? 'border-marca-600 bg-marca-50 text-marca-700'
+              : 'border-slate-300 text-slate-600'
+          }`}
+        >
+          <span aria-hidden="true">{rascunho.favorito ? '★' : '☆'}</span>
+          {rascunho.favorito ? 'Favorito — aparece no topo' : 'Marcar como favorito'}
+        </button>
+
         <Campo rotulo="Nome" htmlFor="nome">
           <input
             id="nome"

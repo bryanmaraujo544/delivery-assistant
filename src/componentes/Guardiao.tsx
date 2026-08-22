@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Outlet } from 'react-router'
 import { lerSessao, limparSessao } from '../auth/sessao'
-import { iniciarSyncAutomatico, jaSincronizou, type EstadoSync } from '../db/sync'
+import { ehContaNova, iniciarSyncAutomatico, jaSincronizou, type EstadoSync } from '../db/sync'
 import { NavInferior } from './NavInferior'
+import { SnackbarGlobal } from './Snackbar'
 
 /**
  * Guarda as rotas autenticadas e mantém a sincronização rodando.
@@ -25,14 +26,14 @@ export interface ContextoApp {
 
 export function Guardiao() {
   const [estado, setEstado] = useState<EstadoSync>('ocioso')
-  const [sincronizado, setSincronizado] = useState(jaSincronizou())
+  const [sincronizado, setSincronizado] = useState(jaSincronizou() || ehContaNova())
   const sessao = lerSessao()
 
   useEffect(() => {
     if (!sessao) return
     return iniciarSyncAutomatico((e) => {
       setEstado(e)
-      setSincronizado(jaSincronizou())
+      setSincronizado(jaSincronizou() || ehContaNova())
     })
   }, [sessao?.token])
 
@@ -42,6 +43,7 @@ export function Guardiao() {
     <>
       <IndicadorSync estado={estado} />
       <Outlet context={{ sincronizado } satisfies ContextoApp} />
+      <SnackbarGlobal />
       <NavInferior
         onSair={() => {
           limparSessao()

@@ -33,6 +33,15 @@ export interface InsumoLocal {
   precoEstimado: boolean
   origemSeed: boolean
 
+  /**
+   * Marcado pela usuaria como favorito — sobe para o topo das listas.
+   *
+   * Complementa o frecency em vez de competir: frecency e INFERIDO do uso,
+   * favorito e DECLARADO. Quem usa muito aparece nos chips; quem ela marcou
+   * aparece no topo da lista, mesmo que ainda nao tenha usado.
+   */
+  favorito: boolean
+
   atualizadoEm: number
   excluidoEm?: number | null
 }
@@ -179,6 +188,23 @@ db.version(4)
       .toCollection()
       .modify((f) => {
         if (typeof f.canalTaxaPercentual !== 'number') f.canalTaxaPercentual = 0
+      })
+  })
+
+/** v5 — `favorito` nos insumos existentes (default false). */
+db.version(5)
+  .stores({
+    insumos: 'id, nomeNormalizado, categoria, favorito, excluidoEm',
+    usoInsumos: 'id, insumoId, contexto',
+    fichas: 'id, nome, categoria, ehBase, excluidoEm',
+    config: 'id',
+  })
+  .upgrade(async (tx) => {
+    await tx
+      .table<InsumoLocal>('insumos')
+      .toCollection()
+      .modify((i) => {
+        if (typeof i.favorito !== 'boolean') i.favorito = false
       })
   })
 

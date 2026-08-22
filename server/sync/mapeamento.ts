@@ -46,6 +46,7 @@ export const zInsumo = z.object({
   fatorCorrecao: z.number().min(1),
   precoEstimado: z.boolean(),
   origemSeed: z.boolean(),
+  favorito: z.boolean().default(false),
   atualizadoEm: z.number().int(),
   excluidoEm: z.number().int().nullish(),
 })

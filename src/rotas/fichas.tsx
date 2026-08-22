@@ -3,8 +3,10 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router'
 import { montarCatalogo, paraConfigDominio } from '../db/catalogo'
 import { Comecar } from '../componentes/Comecar'
+import { normalizar } from '../db/local'
 import { db, type FichaLocal } from '../db/local'
 import type { ContextoApp } from '../componentes/Guardiao'
+import { esquecerContaNova } from '../db/sync'
 import { aplicarTaxaDeCanal, calcularCustoFicha, calcularPreco } from '../dominio/custo'
 import { formatarBRL } from '../dominio/dinheiro'
 
@@ -21,6 +23,7 @@ export function Fichas() {
    * terminou.
    */
   const [comecarAtivo, setComecarAtivo] = useState(false)
+  const [busca, setBusca] = useState('')
 
   const dados = useLiveQuery(async () => {
     const [insumos, fichas, config] = await Promise.all([
@@ -63,6 +66,12 @@ export function Fichas() {
     navigate(`/fichas/${copia.id}`)
   }
 
+  // busca sem acento, igual a de insumos: "cenoura" acha "Bolo de Cenoura"
+  const buscaNorm = normalizar(busca)
+  const fichasVisiveis = (dados?.fichas ?? []).filter((f) =>
+    normalizar(f.nome).includes(buscaNorm),
+  )
+
   const contaNova = !!dados && dados.fichas.length === 0 && dados.insumos.length === 0 && sincronizado
   useEffect(() => {
     if (contaNova) setComecarAtivo(true)
@@ -76,6 +85,18 @@ export function Fichas() {
     <main className="mx-auto flex min-h-dvh max-w-md flex-col bg-slate-50 pb-32">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white px-4 pt-4 pb-3">
         <h1 className="text-2xl font-bold text-slate-900">Fichas técnicas</h1>
+        {/* so aparece quando ha o que buscar: campo de busca numa lista de 2
+            itens e ruido que empurra o conteudo para baixo */}
+        {(dados?.fichas.length ?? 0) > 4 && (
+          <input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar ficha"
+            aria-label="Buscar ficha"
+            className="mt-3 h-12 w-full rounded-xl border border-slate-300 px-4
+                       focus:border-marca-600 focus:ring-2 focus:ring-marca-500/30 focus:outline-none"
+          />
+        )}
       </header>
 
       <div className="flex-1 px-4">
@@ -86,6 +107,7 @@ export function Fichas() {
         {comecarAtivo && (
           <Comecar
             onPronto={(fichaId) => {
+              esquecerContaNova()
               setComecarAtivo(false)
               if (fichaId) navigate(`/fichas/${fichaId}`)
               else criar()
@@ -108,8 +130,12 @@ export function Fichas() {
           </div>
         )}
 
+        {busca && fichasVisiveis.length === 0 && (
+          <p className="mt-8 text-center text-slate-500">Nenhuma ficha com “{busca}”.</p>
+        )}
+
         <ul className="mt-4 space-y-2">
-          {dados?.fichas.map((f) => (
+          {fichasVisiveis.map((f) => (
             <LinhaFicha
               key={f.id}
               ficha={f}
@@ -171,9 +197,11 @@ function LinhaFicha({
     // ficha incompleta ou com ciclo — a lista nao e o lugar de gritar erro
   }
 
+  // O botao de duplicar e IRMAO do de abrir, nao aninhado: <button> dentro de
+  // <button> e HTML invalido e o navegador decide sozinho qual recebe o toque.
   return (
-    <li className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-      <button onClick={onAbrir} className="flex w-full items-center gap-3 px-4 py-3 text-left">
+    <li className="flex items-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <button onClick={onAbrir} className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left">
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-slate-900">
             {ficha.nome}
@@ -198,14 +226,14 @@ function LinhaFicha({
             <p className="text-xs text-slate-400">sem itens</p>
           )}
         </div>
-        <button
-          onClick={onDuplicar}
-          aria-label={`Duplicar ${ficha.nome}`}
-          title="Duplicar"
-          className="shrink-0 rounded-lg px-2 text-slate-400 hover:bg-slate-100"
-        >
-          ⧉
-        </button>
+      </button>
+      <button
+        onClick={onDuplicar}
+        aria-label={`Duplicar ${ficha.nome}`}
+        title="Duplicar"
+        className="shrink-0 self-stretch px-4 text-slate-400 hover:bg-slate-100"
+      >
+        ⧉
       </button>
     </li>
   )
