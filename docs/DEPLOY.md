@@ -82,12 +82,17 @@ existir antes, e mudar exige rebuild. Se faltar, o build do front **falha alto
 de propósito**, em vez de publicar um app que tenta falar com `localhost` e
 quebra em toda tela sem dizer por quê.
 
-### Cache: o service worker não pode ser cacheado
+### O que o `vercel.json` faz, e por quê
 
-O `vercel.json` marca `/sw.js` como `must-revalidate` e os `/assets/*` como
-`immutable`. Assets têm hash no nome e podem viver para sempre; **o service
-worker não** — se ficar preso numa versão antiga, a usuária continua rodando um
-app velho depois do deploy, sem forma de sair disso.
+O arquivo não tem comentários porque **a Vercel valida o schema estritamente** e
+rejeita qualquer propriedade desconhecida — inclusive a convenção `"//"` que
+funciona em `package.json`. Um build já falhou por isso. A explicação fica aqui:
+
+| Regra | Motivo |
+|---|---|
+| `rewrites` → `/index.html` (exceto `/assets/`) | Fallback de SPA: o roteamento é do cliente, então abrir `/fichas` direto ou recarregar precisa devolver o HTML, não 404 |
+| `/assets/*` → `immutable`, 1 ano | Têm hash no nome; se o conteúdo mudar, o nome muda |
+| `/sw.js` → `must-revalidate` | **O service worker não pode ser cacheado.** Preso numa versão antiga, a usuária continua rodando um app velho depois do deploy, sem forma de sair disso |
 
 ---
 
