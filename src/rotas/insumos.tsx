@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router'
 import { BottomSheet } from '../componentes/BottomSheet'
 import { CampoDinheiro } from '../componentes/CampoDinheiro'
 import { useSnackbar } from '../componentes/Snackbar'
@@ -28,6 +29,8 @@ type Rascunho = typeof rascunhoVazio
 /* ─────────────────────────── tela ─────────────────────────── */
 
 export function Insumos() {
+  const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
   const [busca, setBusca] = useState('')
   const [editando, setEditando] = useState<InsumoLocal | null>(null)
   const [sheetAberto, setSheetAberto] = useState(false)
@@ -104,8 +107,8 @@ export function Insumos() {
       excluidoEm: null,
     }
     await db.insumos.put(registro)
-    setSheetAberto(false)
     mostrar(editando ? 'Insumo atualizado' : `"${registro.nome}" adicionado`)
+    fecharSheet()
   }
 
   /** Soft delete + desfazer. Nunca modal "tem certeza?" para acao rotineira. */
@@ -120,6 +123,32 @@ export function Insumos() {
   async function aplicarSeed() {
     await db.insumos.bulkPut(construirSeed())
     mostrar('Catálogo inicial carregado. Confirme os preços conforme comprar.')
+  }
+
+  /**
+   * Abertura direta via `?insumo=<id>`, vindo do atalho na ficha tecnica.
+   *
+   * O parametro e consumido (removido da URL) assim que abre: se ficasse,
+   * fechar o sheet e recarregar a pagina reabriria o mesmo insumo, e voltar
+   * pelo historico ficaria preso num laco.
+   */
+  const insumoDaUrl = params.get('insumo')
+  const voltarPara = params.get('voltar')
+
+  useEffect(() => {
+    if (!insumoDaUrl || !insumos) return
+    const alvo = insumos.find((i) => i.id === insumoDaUrl)
+    if (alvo) abrirEdicao(alvo)
+    setParams((p) => {
+      p.delete('insumo')
+      return p
+    }, { replace: true })
+  }, [insumoDaUrl, insumos])
+
+  /** Fechar o sheet devolve para a ficha de origem, quando veio de la. */
+  function fecharSheet() {
+    setSheetAberto(false)
+    if (voltarPara) navigate(decodeURIComponent(voltarPara))
   }
 
   const carregando = insumos === undefined
@@ -191,7 +220,7 @@ export function Insumos() {
         rascunho={rascunho}
         duplicata={duplicata}
         onChange={setRascunho}
-        onFechar={() => setSheetAberto(false)}
+        onFechar={fecharSheet}
         onSalvar={salvar}
         onExcluir={editando ? () => excluir(editando) : undefined}
         onUsarExistente={(i) => {

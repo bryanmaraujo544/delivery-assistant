@@ -155,6 +155,16 @@ export function FichaEditor() {
                   patch({ itens: ficha.itens.map((it, j) => (j === i ? { ...it, unidade: u } : it)) })
                 }
                 onRemover={() => removerItem(i)}
+                onEditar={() => {
+                  // volta para esta ficha depois de editar: sem isso ela
+                  // corrige o preco e fica presa na tela de insumos
+                  const voltar = encodeURIComponent(`/fichas/${ficha.id}`)
+                  if (item.tipo === 'insumo') {
+                    navigate(`/insumos?insumo=${item.insumoId}&voltar=${voltar}`)
+                  } else {
+                    navigate(`/fichas/${item.fichaId}`)
+                  }
+                }}
               />
             ))}
           </ul>
@@ -412,6 +422,7 @@ function LinhaItem({
   onQuantidade,
   onUnidade,
   onRemover,
+  onEditar,
 }: {
   item: ItemFicha
   insumos: InsumoLocal[]
@@ -420,6 +431,7 @@ function LinhaItem({
   onQuantidade: (q: number) => void
   onUnidade: (u: string) => void
   onRemover: () => void
+  onEditar: () => void
 }) {
   const insumo = item.tipo === 'insumo' ? insumos.find((i) => i.id === item.insumoId) : undefined
   const sub = item.tipo === 'subficha' ? fichas.find((f) => f.id === item.fichaId) : undefined
@@ -434,10 +446,21 @@ function LinhaItem({
   return (
     <li className="py-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="min-w-0 flex-1 truncate font-medium text-slate-900">
-          {nome}
-          {sub && <span className="ml-1.5 text-xs text-slate-500">(receita)</span>}
-        </span>
+        {/* O nome e o atalho para corrigir o insumo.
+            Quando o custo na ficha parece errado, o impulso e consertar o preco
+            ALI — mandar procurar em outra tela e o atrito que este produto
+            existe para eliminar. */}
+        <button
+          onClick={onEditar}
+          className="-my-1 flex min-w-0 flex-1 items-center gap-1 py-1 text-left"
+          aria-label={`Editar ${nome}`}
+        >
+          <span className="min-w-0 truncate font-medium text-slate-900 underline decoration-slate-300 underline-offset-4">
+            {nome}
+          </span>
+          {sub && <span className="shrink-0 text-xs text-slate-500">(receita)</span>}
+          <span aria-hidden="true" className="shrink-0 text-slate-400">›</span>
+        </button>
         <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-700">
           {custo !== undefined ? formatarBRL(custo) : '—'}
         </span>
