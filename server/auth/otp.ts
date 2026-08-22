@@ -8,7 +8,18 @@ import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 
 export const OTP_DIGITOS = 6
 export const OTP_VALIDADE_MS = 10 * 60_000
 export const OTP_MAX_TENTATIVAS = 5
-export const SESSAO_VALIDADE_MS = 30 * 24 * 60 * 60_000
+/**
+ * 90 dias.
+ *
+ * O app e usado na cozinha, no celular pessoal, por uma pessoa so. Sessao curta
+ * aqui nao aumenta seguranca de forma util — so cria o risco de deslogar quem
+ * NAO tem como se recuperar, ja que a redefinicao de senha depende de e-mail e
+ * ainda nao existe.
+ *
+ * NAO e deslizante: a validade conta da criacao, nao do ultimo uso. Quem usa
+ * todo dia ainda assim reloga a cada 90 dias.
+ */
+export const SESSAO_VALIDADE_MS = 90 * 24 * 60 * 60_000
 
 /**
  * `Math.random()` NAO serve para gerar codigo de autenticacao: e previsivel a

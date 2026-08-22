@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Outlet } from 'react-router'
 import { lerSessao, limparSessao } from '../auth/sessao'
-import { ehContaNova, iniciarSyncAutomatico, jaSincronizou, type EstadoSync } from '../db/sync'
+import {
+  ehContaNova,
+  iniciarSyncAutomatico,
+  jaSincronizou,
+  limparDadosLocais,
+  type EstadoSync,
+} from '../db/sync'
+import { ConfirmarSaida } from './ConfirmarSaida'
 import { NavInferior } from './NavInferior'
 import { SnackbarGlobal } from './Snackbar'
 
@@ -27,6 +34,7 @@ export interface ContextoApp {
 export function Guardiao() {
   const [estado, setEstado] = useState<EstadoSync>('ocioso')
   const [sincronizado, setSincronizado] = useState(jaSincronizou() || ehContaNova())
+  const [confirmandoSaida, setConfirmandoSaida] = useState(false)
   const sessao = lerSessao()
 
   useEffect(() => {
@@ -44,10 +52,15 @@ export function Guardiao() {
       <IndicadorSync estado={estado} />
       <Outlet context={{ sincronizado } satisfies ContextoApp} />
       <SnackbarGlobal />
-      <NavInferior
-        onSair={() => {
+      <NavInferior onSair={() => setConfirmandoSaida(true)} />
+
+      <ConfirmarSaida
+        aberto={confirmandoSaida}
+        email={sessao.email}
+        onCancelar={() => setConfirmandoSaida(false)}
+        onConfirmar={async () => {
+          await limparDadosLocais()
           limparSessao()
-          localStorage.removeItem('precifica.ultimoSync')
           location.href = '/login'
         }}
       />

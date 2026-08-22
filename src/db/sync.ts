@@ -46,6 +46,24 @@ export const jaSincronizou = () => lerUltimoSync() > 0
 export const ehContaNova = () => localStorage.getItem('precifica.contaNova') === '1'
 export const esquecerContaNova = () => localStorage.removeItem('precifica.contaNova')
 
+/**
+ * Sair TEM de limpar o banco local.
+ *
+ * VAZAMENTO ENTRE CONTAS que isto fecha: antes, sair limpava so a sessao e o
+ * `ultimoSync`, deixando insumos e fichas no IndexedDB. Quando outra pessoa
+ * entrasse no mesmo aparelho, `ultimoSync` voltaria a 0, `atualizadoEm > 0`
+ * casaria com TODOS os registros, e o catalogo inteiro da primeira subiria
+ * para o tenant da segunda.
+ *
+ * O servidor e a fonte da verdade: o que ja sincronizou volta no proximo login.
+ * O que nao subiu se perde — por isso a confirmacao avisa quantos sao.
+ */
+export async function limparDadosLocais() {
+  await db.delete()
+  localStorage.removeItem(CHAVE_ULTIMO)
+  localStorage.removeItem('precifica.contaNova')
+}
+
 /** Só o que mudou desde a última sincronização bem-sucedida. */
 async function coletarPendentes(desde: number) {
   const [insumos, fichas, config] = await Promise.all([
