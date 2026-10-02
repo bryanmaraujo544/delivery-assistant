@@ -44,7 +44,8 @@ Decisões e aprendizados vão em [APRENDIZADOS.md](APRENDIZADOS.md) — aqui fic
 - [x] Arrumar a tela de venda arrastando os cartões; editar produto direto do balcão; faixa "Sem estoque"
 - [x] Migration `0007` (`produto.ordem`) aplicada no Neon em 01/10/2026 (autorizada pelo Bryan) — conferido: coluna `integer` anulável, 8 migrations registradas. PR #2 mergeado em seguida
 - [x] Financeiro: despesas do mês (única, todo mês, parcelada), resultado em DRE simplificada e ponto de equilíbrio — PR aberto
-- [ ] **Aplicar a migration `0008` (`despesa`) no Neon e mergear o PR do financeiro** ← precisa do ok do Bryan; a migration vem antes do merge
+- [ ] **Aplicar as migrations `0008` (`despesa`) e `0009` (`produto.custo_centavos`) no Neon e mergear o PR #5** ← precisa do ok do Bryan; as migrations vêm antes do merge
+- [ ] Mergear o PR #6 (login: sessão deslizante, lembrar credenciais) ← precisa do ok do Bryan; sem banco
 - [ ] **Merge em `main` e deploy** ← só com ordem do Bryan. **A API sobe antes do front** (ver log)
 - [ ] Teste em aparelho real (celular Android barato: o blur do vidro pesa)
 

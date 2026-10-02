@@ -340,7 +340,11 @@ Decisões:
 
 - **A pessoa escolhe a categoria, nunca o "tipo".** Luz, Aluguel, Ingredientes — fixa/variável/custo vem junto da categoria. Ninguém no balcão sabe o que é despesa variável
 - **Separar fixa de variável vale a pena** porque dá o **ponto de equilíbrio** (`fixas ÷ índice de margem de contribuição`), mostrado como "a loja precisa vender R$ X no mês, cerca de R$ Y por dia"
-- **Custo dos produtos = compras lançadas, não custo das fichas.** A ficha embute mão de obra e rateio de custo fixo; subtrair o custo da ficha **e** as despesas contaria luz e salário duas vezes. Consequência assumida: o resultado é mais próximo de caixa do que de competência (comprar farinha para dois meses pesa no mês da compra)
+- ~~Custo dos produtos = compras lançadas~~ **REVOGADO no mesmo dia, a pedido do Bryan.** O custo vem das **fichas técnicas**, gravado em cada venda. Pelas compras, o resultado dependia de quando se foi ao mercado. Três cuidados para o número não mentir:
+  - entra só o **custo de materiais** (`custoMateriaisCentavos`), sem mão de obra nem rateio — senão luz e salário contam duas vezes. É calculado com a config zerada, não pelo campo `materiais` da ficha, que em ficha com sub-receita já embute a mão de obra da massa e do recheio
+  - produto sem ficha ganhou **custo manual** (`produto.custoCentavos`); item sem custo nenhum **não vira zero**: a tela mostra quanto do faturamento está sem custo e avisa que o resultado real é menor
+  - as **compras** de ingredientes viraram comparação ("usado nas vendas × comprado no mês"). A diferença é o que a ficha não enxerga: sobra, desperdício, estoque parado, ficha desatualizada
+  - vendas anteriores a esse campo ficam sem custo para sempre
 - **Parcelada = uma despesa por mês**, criadas de uma vez. O valor informado é o da parcela, que é o número do carnê
 - **"Todo mês" não gera despesa sozinha.** Aparece um botão para trazer do mês anterior, e a pessoa confere o valor. Conta de luz muda; despesa fantasma com número velho é pior que um toque a mais
 - **Id derivado de série + mês** ao trazer as repetições: dois aparelhos offline geram o mesmo registro, não dois aluguéis
