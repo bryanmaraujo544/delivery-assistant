@@ -7,6 +7,7 @@ import {
   unidadePorCodigo,
   type FichaLocal,
   type InsumoLocal,
+  type DespesaLocal,
   type ProdutoLocal,
 } from './local'
 
@@ -36,6 +37,20 @@ const CHAVE_ULTIMO = 'precifica.ultimoSync'
 
 const lerUltimoSync = () => Number(localStorage.getItem(CHAVE_ULTIMO) ?? 0)
 const gravarUltimoSync = (t: number) => localStorage.setItem(CHAVE_ULTIMO, String(t))
+
+const CHAVE_VENDAS_DESDE = 'precifica.vendasDesde'
+/** igual a JANELA_PRIMEIRO_PULL_MS do servidor */
+const JANELA_VENDAS_MS = 60 * 24 * 60 * 60 * 1000
+
+/**
+ * A partir de quando este aparelho tem TODAS as vendas.
+ *
+ * O primeiro pull de um aparelho so traz o historico recente. Quem soma vendas
+ * por mes (o resultado financeiro) precisa saber disso: mostrar "faturamento
+ * R$ 0" para um mes que simplesmente nao foi baixado seria informar um
+ * prejuizo que nao existiu.
+ */
+export const vendasCompletasDesde = () => Number(localStorage.getItem(CHAVE_VENDAS_DESDE) ?? 0)
 
 export type EstadoSync = 'ocioso' | 'sincronizando' | 'offline' | 'erro'
 
@@ -75,12 +90,13 @@ export const esquecerContaNova = () => localStorage.removeItem('precifica.contaN
 export async function limparDadosLocais() {
   await db.delete()
   localStorage.removeItem(CHAVE_ULTIMO)
+  localStorage.removeItem(CHAVE_VENDAS_DESDE)
   localStorage.removeItem('precifica.contaNova')
 }
 
 /** Só o que mudou desde a última sincronização bem-sucedida. */
 async function coletarPendentes(desde: number) {
-  const [insumos, fichas, config, produtos, sessoes, movimentos, vendas, contagens] = await Promise.all([
+  const [insumos, fichas, config, produtos, sessoes, movimentos, vendas, contagens, despesas] = await Promise.all([
     db.insumos.filter((i) => i.atualizadoEm > desde).toArray(),
     db.fichas.filter((f) => f.atualizadoEm > desde).toArray(),
     db.config.get('default'),
@@ -89,8 +105,9 @@ async function coletarPendentes(desde: number) {
     db.caixaMovimentos.where('pendente').equals(1).toArray(),
     db.vendas.where('pendente').equals(1).toArray(),
     db.estoqueContagens.where('pendente').equals(1).toArray(),
+    db.despesas.filter((d) => d.atualizadoEm > desde).toArray(),
   ])
-  return { insumos, fichas, config, produtos, sessoes, movimentos, vendas, contagens }
+  return { insumos, fichas, config, produtos, sessoes, movimentos, vendas, contagens, despesas }
 }
 
 export async function contarPendentes(): Promise<number> {
@@ -102,7 +119,8 @@ export async function contarPendentes(): Promise<number> {
     p.sessoes.length +
     p.movimentos.length +
     p.vendas.length +
-    p.contagens.length
+    p.contagens.length +
+    p.despesas.length
   )
 }
 
@@ -119,11 +137,12 @@ export async function sincronizar(): Promise<{ estado: EstadoSync; enviados: num
   const desde = lerUltimoSync()
 
   try {
-    const { insumos, fichas, config, produtos, sessoes, movimentos, vendas, contagens } =
+    const { insumos, fichas, config, produtos, sessoes, movimentos, vendas, contagens, despesas } =
       await coletarPendentes(desde)
     const fatos = sessoes.length + movimentos.length + vendas.length + contagens.length
 
-    if (insumos.length > 0 || fichas.length > 0 || produtos.length > 0 || fatos > 0 || desde === 0) {
+    const catalogo = insumos.length + fichas.length + produtos.length + despesas.length
+    if (catalogo > 0 || fatos > 0 || desde === 0) {
       const rPush = await api('/sync/push', {
         method: 'POST',
         body: JSON.stringify({
@@ -142,6 +161,7 @@ export async function sincronizar(): Promise<{ estado: EstadoSync; enviados: num
           movimentos: movimentos.map(semPendencia),
           vendas: vendas.map(semPendencia),
           contagens: contagens.map(semPendencia),
+          despesas,
         }),
       })
       if (!rPush.ok) throw new Error(`push falhou: ${rPush.status}`)
@@ -155,7 +175,8 @@ export async function sincronizar(): Promise<{ estado: EstadoSync; enviados: num
         (recebidos?.sessoes ?? 0) !== sessoes.length ||
         (recebidos?.movimentos ?? 0) !== movimentos.length ||
         (recebidos?.vendas ?? 0) !== vendas.length ||
-        (recebidos?.contagens ?? 0) !== contagens.length
+        (recebidos?.contagens ?? 0) !== contagens.length ||
+        (recebidos?.despesas ?? 0) !== despesas.length
       ) {
         throw new Error('servidor não confirmou o recebimento de produtos/caixa/vendas')
       }
@@ -169,6 +190,7 @@ export async function sincronizar(): Promise<{ estado: EstadoSync; enviados: num
     const dados = (await rPull.json()) as RespostaPull
 
     await aplicarPull(dados)
+    if (desde === 0) localStorage.setItem(CHAVE_VENDAS_DESDE, String(dados.servidorEm - JANELA_VENDAS_MS))
 
     // carimbo do SERVIDOR: relógio de celular erra, e um adiantado faria o
     // cliente pular mudanças na próxima rodada
@@ -176,7 +198,7 @@ export async function sincronizar(): Promise<{ estado: EstadoSync; enviados: num
 
     return {
       estado: 'ocioso',
-      enviados: insumos.length + fichas.length + produtos.length + fatos,
+      enviados: catalogo + fatos,
       recebidos: dados.insumos.length + dados.fichas.length,
     }
   } catch (e) {
@@ -195,6 +217,7 @@ interface RespostaPull {
   movimentos?: MovimentoCaixa[]
   vendas?: Venda[]
   contagens?: ContagemEstoque[]
+  despesas?: DespesaLocal[]
 }
 
 /**
@@ -242,6 +265,14 @@ async function aplicarPull(d: RespostaPull) {
 
   // contagem e imutavel: a que ja existe aqui e identica a que desce
   await db.estoqueContagens.bulkPut((d.contagens ?? []).map((c) => ({ ...c, pendente: 0 as const })))
+
+  await db.transaction('rw', db.despesas, async () => {
+    for (const x of d.despesas ?? []) {
+      const local = await db.despesas.get(x.id)
+      if (local && local.atualizadoEm > x.atualizadoEm) continue
+      await db.despesas.put(x)
+    }
+  })
 
   await db.transaction('rw', db.insumos, db.fichas, db.config, db.produtos, async () => {
     for (const p of d.produtos ?? []) {
@@ -295,6 +326,7 @@ const paraEnvioProduto = (p: ProdutoLocal) => ({
   precoCentavos: p.precoCentavos,
   fichaId: p.fichaId ?? null,
   ordem: p.ordem ?? null,
+  custoCentavos: p.custoCentavos ?? null,
   atualizadoEm: p.atualizadoEm,
   excluidoEm: p.excluidoEm ?? null,
 })

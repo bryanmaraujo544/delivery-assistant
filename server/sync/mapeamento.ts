@@ -84,6 +84,7 @@ export const zProduto = z.object({
   precoCentavos: z.number().int().min(0),
   fichaId: z.uuid().nullish(),
   ordem: z.number().int().min(0).nullish(),
+  custoCentavos: z.number().int().min(0).nullish(),
   atualizadoEm: z.number().int(),
   excluidoEm: z.number().int().nullish(),
 })
@@ -120,6 +121,7 @@ export const zVenda = z.object({
         precoUnitarioCentavos: z.number().int().min(0),
         quantidade: z.number().int().positive(),
         custoUnitarioCentavos: z.number().int().min(0).nullable(),
+        custoMateriaisCentavos: z.number().int().min(0).nullish(),
       }),
     )
     .min(1)
@@ -140,6 +142,21 @@ export const zContagemEstoque = z.object({
   criadoEm: z.number().int(),
 })
 
+export const zDespesa = z.object({
+  id: z.uuid(),
+  descricao: z.string().min(1).max(200),
+  categoria: z.string().min(1).max(50),
+  valorCentavos: z.number().int().min(0),
+  mes: z.string().regex(/^[0-9]{4}-(0[1-9]|1[0-2])$/),
+  repete: z.boolean(),
+  serieId: z.uuid(),
+  parcela: z.number().int().min(1).nullish(),
+  parcelas: z.number().int().min(2).max(120).nullish(),
+  pagoEm: z.number().int().nullish(),
+  atualizadoEm: z.number().int(),
+  excluidoEm: z.number().int().nullish(),
+})
+
 export const zPush = z.object({
   // teto por lote: um cliente offline ha semanas nao pode derrubar o servidor
   insumos: z.array(zInsumo).max(500).default([]),
@@ -150,6 +167,7 @@ export const zPush = z.object({
   movimentos: z.array(zMovimentoCaixa).max(500).default([]),
   vendas: z.array(zVenda).max(500).default([]),
   contagens: z.array(zContagemEstoque).max(500).default([]),
+  despesas: z.array(zDespesa).max(500).default([]),
 })
 
 export type InsumoSync = z.infer<typeof zInsumo>
@@ -159,6 +177,7 @@ export type SessaoCaixaSync = z.infer<typeof zSessaoCaixa>
 export type MovimentoCaixaSync = z.infer<typeof zMovimentoCaixa>
 export type VendaSync = z.infer<typeof zVenda>
 export type ContagemEstoqueSync = z.infer<typeof zContagemEstoque>
+export type DespesaSync = z.infer<typeof zDespesa>
 
 /** `numeric` do Postgres volta como string no driver — converter na fronteira. */
 export const num = (v: string | number | null): number | null =>

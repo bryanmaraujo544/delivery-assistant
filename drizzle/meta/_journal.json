@@ -57,6 +57,20 @@
       "when": 1790906352401,
       "tag": "0007_spicy_nitro",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790964858218,
+      "tag": "0008_modern_albert_cleary",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790968263921,
+      "tag": "0009_loving_rogue",
+      "breakpoints": true
     }
   ]
 }

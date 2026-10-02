@@ -5,6 +5,7 @@ import {
   caixaMovimento,
   caixaSessao,
   configProducao,
+  despesa,
   estoqueContagem,
   fichaItem,
   fichaPerda,
@@ -21,6 +22,7 @@ import {
   num,
   zPush,
   type ContagemEstoqueSync,
+  type DespesaSync,
   type FichaSync,
   type InsumoSync,
   type MovimentoCaixaSync,
@@ -73,7 +75,8 @@ export async function registrarRotasSync(app: FastifyInstance) {
     if (!parse.success) {
       return reply.code(400).send({ erro: 'payload inválido', detalhe: parse.error.issues.slice(0, 5) })
     }
-    const { insumos, fichas, config, produtos, sessoes, movimentos, vendas, contagens } = parse.data
+    const { insumos, fichas, config, produtos, sessoes, movimentos, vendas, contagens, despesas } =
+      parse.data
 
     // a aritmetica da venda e conferida aqui, com a MESMA funcao do cliente:
     // o servidor nunca grava um total so porque ele veio no corpo
@@ -115,6 +118,7 @@ export async function registrarRotasSync(app: FastifyInstance) {
       for (const m of movimentos) await gravarMovimento(tx, ctx.tenantId, m)
       for (const v of vendas) await gravarVenda(tx, ctx.tenantId, v)
       for (const c of contagens) await gravarContagem(tx, ctx.tenantId, c)
+      for (const d of despesas) await gravarDespesa(tx, ctx.tenantId, d)
     })
 
     return {
@@ -130,6 +134,7 @@ export async function registrarRotasSync(app: FastifyInstance) {
         movimentos: movimentos.length,
         vendas: vendas.length,
         contagens: contagens.length,
+        despesas: despesas.length,
       },
     }
   })
@@ -200,6 +205,11 @@ export async function registrarRotasSync(app: FastifyInstance) {
           ),
         ),
     ])
+
+    const despesasDb = await db
+      .select()
+      .from(despesa)
+      .where(and(eq(despesa.tenantId, ctx.tenantId), gt(despesa.atualizadoEm, desde)))
 
     const [insumosDb, fichasDb, cfg] = await Promise.all([
       db
@@ -294,6 +304,7 @@ export async function registrarRotasSync(app: FastifyInstance) {
         precoCentavos: p.precoCentavos,
         fichaId: p.fichaId,
         ordem: p.ordem,
+        custoCentavos: p.custoCentavos,
         atualizadoEm: p.atualizadoEm.getTime(),
         excluidoEm: p.excluidoEm?.getTime() ?? null,
       })),
@@ -324,6 +335,20 @@ export async function registrarRotasSync(app: FastifyInstance) {
         criadaEm: v.criadaEm.getTime(),
         canceladaEm: v.canceladaEm?.getTime() ?? null,
         motivoCancelamento: v.motivoCancelamento,
+      })),
+      despesas: despesasDb.map((d) => ({
+        id: d.id,
+        descricao: d.descricao,
+        categoria: d.categoria,
+        valorCentavos: d.valorCentavos,
+        mes: d.mes,
+        repete: d.repete,
+        serieId: d.serieId,
+        parcela: d.parcela,
+        parcelas: d.parcelas,
+        pagoEm: d.pagoEm?.getTime() ?? null,
+        atualizadoEm: d.atualizadoEm.getTime(),
+        excluidoEm: d.excluidoEm?.getTime() ?? null,
       })),
       contagens: contagensDb.map((c) => ({
         id: c.id,
@@ -436,6 +461,7 @@ async function gravarProduto(tx: Tx, tenantId: string, p: ProdutoSync) {
     precoCentavos: p.precoCentavos,
     fichaId: p.fichaId ?? null,
     ordem: p.ordem ?? null,
+    custoCentavos: p.custoCentavos ?? null,
     atualizadoEm: new Date(p.atualizadoEm),
     excluidoEm: p.excluidoEm ? new Date(p.excluidoEm) : null,
   }
@@ -533,4 +559,31 @@ async function gravarContagem(tx: Tx, tenantId: string, c: ContagemEstoqueSync) 
       criadoEm: new Date(c.criadoEm),
     })
     .onConflictDoNothing()
+}
+
+async function gravarDespesa(tx: Tx, tenantId: string, d: DespesaSync) {
+  const linha = {
+    id: d.id,
+    tenantId,
+    descricao: d.descricao,
+    categoria: d.categoria,
+    valorCentavos: d.valorCentavos,
+    mes: d.mes,
+    repete: d.repete,
+    serieId: d.serieId,
+    parcela: d.parcela ?? null,
+    parcelas: d.parcelas ?? null,
+    pagoEm: d.pagoEm ? new Date(d.pagoEm) : null,
+    atualizadoEm: new Date(d.atualizadoEm),
+    excluidoEm: d.excluidoEm ? new Date(d.excluidoEm) : null,
+  }
+  await tx
+    .insert(despesa)
+    .values(linha)
+    .onConflictDoUpdate({
+      target: despesa.id,
+      set: linha,
+      // LWW, e so dentro do proprio tenant
+      setWhere: and(eq(despesa.tenantId, tenantId), lt(despesa.atualizadoEm, new Date(d.atualizadoEm))),
+    })
 }

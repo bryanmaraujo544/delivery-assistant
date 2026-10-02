@@ -27,7 +27,9 @@ const LOJA: Item[] = [
   { para: '/produtos', rotulo: 'Produtos', icone: 'M4 8l8-4 8 4-8 4-8-4zm0 0v8l8 4 8-4V8m-8 4v8' },
 ]
 
+/** Bastidor: nao e do balcao, e de quem cuida do negocio. */
 const CUSTOS: Item[] = [
+  { para: '/financeiro', rotulo: 'Financeiro', icone: 'M12 3v18M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3 2 3 4.5 3 4.5 1.3 4.5 3-2 3-4.5 3-4.5-1.3-4.5-3' },
   { para: '/fichas', rotulo: 'Fichas técnicas', icone: 'M6 3h9l4 4v14H6zM9 12h7M9 16h7M9 8h3' },
   { para: '/insumos', rotulo: 'Insumos', icone: 'M5 8h14l-1 13H6L5 8zm3 0a4 4 0 018 0' },
 ]
@@ -71,7 +73,7 @@ export function Navegacao({ email, onSair }: { email: string; onSair: () => void
         </ul>
 
         <p className="px-3 pt-6 pb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-          Custos
+          Gestão
         </p>
         <ul className="space-y-1">
           {CUSTOS.map((i) => (

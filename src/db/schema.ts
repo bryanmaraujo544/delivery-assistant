@@ -406,6 +406,8 @@ export const produto = pgTable(
     fichaId: uuid('ficha_id'),
     /** posicao escolhida a mao na tela de venda; nulo = ainda nao arrumado */
     ordem: integer('ordem'),
+    /** custo por unidade informado a mao, para produto sem ficha (revenda) */
+    custoCentavos: integer('custo_centavos'),
     criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
     atualizadoEm: timestamp('atualizado_em', { withTimezone: true }).notNull().defaultNow(),
     excluidoEm: timestamp('excluido_em', { withTimezone: true }),
@@ -413,6 +415,7 @@ export const produto = pgTable(
   (t) => [
     index('produto_tenant_idx').on(t.tenantId),
     check('produto_preco_nao_negativo', sql`preco_centavos >= 0`),
+    check('produto_custo_nao_negativo', sql`custo_centavos IS NULL OR custo_centavos >= 0`),
   ],
 )
 
@@ -500,6 +503,46 @@ export const venda = pgTable(
     index('venda_sync_idx').on(t.tenantId, t.sincronizadoEm),
     index('venda_tenant_data_idx').on(t.tenantId, t.criadaEm),
     check('venda_valores_nao_negativos', sql`total_centavos >= 0 AND desconto_centavos >= 0 AND troco_centavos >= 0`),
+  ],
+)
+
+/**
+ * Despesa do mes (aluguel, luz, parcela de equipamento, compra de insumo).
+ * Registro editavel, LWW por `atualizado_em`.
+ *
+ * `mes` e texto 'AAAA-MM' e nao data: e o mes de COMPETENCIA, sem dia nem
+ * fuso. Como timestamp, a despesa de "outubro" lancada no dia 1 a meia-noite
+ * de Sao Paulo cairia em setembro para quem lesse em UTC.
+ */
+export const despesa = pgTable(
+  'despesa',
+  {
+    id: uuid('id').primaryKey(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenant.id, { onDelete: 'cascade' }),
+    descricao: text('descricao').notNull(),
+    categoria: text('categoria').notNull(),
+    valorCentavos: integer('valor_centavos').notNull(),
+    mes: text('mes').notNull(),
+    repete: boolean('repete').notNull().default(false),
+    /** liga as ocorrencias da mesma despesa entre os meses */
+    serieId: uuid('serie_id').notNull(),
+    parcela: integer('parcela'),
+    parcelas: integer('parcelas'),
+    pagoEm: timestamp('pago_em', { withTimezone: true }),
+    criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
+    atualizadoEm: timestamp('atualizado_em', { withTimezone: true }).notNull().defaultNow(),
+    excluidoEm: timestamp('excluido_em', { withTimezone: true }),
+  },
+  (t) => [
+    index('despesa_tenant_mes_idx').on(t.tenantId, t.mes),
+    check('despesa_valor_nao_negativo', sql`valor_centavos >= 0`),
+    check('despesa_mes_formato', sql`mes ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
+    check(
+      'despesa_parcela_coerente',
+      sql`(parcela IS NULL AND parcelas IS NULL) OR (parcela >= 1 AND parcela <= parcelas)`,
+    ),
   ],
 )
 
