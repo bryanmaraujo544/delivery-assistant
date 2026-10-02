@@ -315,6 +315,16 @@ const paraEnvioFicha = (f: FichaLocal) => ({
  * demais. `online` + `visibilitychange` cobrem os casos reais — voltou a
  * conexão, ou a pessoa voltou ao app depois de trocar de aba.
  */
+const EVENTO_PEDIR_SYNC = 'precifica:sync'
+
+/**
+ * Pede uma sincronização agora, sem esperar o intervalo.
+ *
+ * Existe para a venda: ela é o único exemplar de um fato enquanto não sobe,
+ * então não faz sentido deixá-la até um minuto só no aparelho com a rede ali.
+ */
+export const pedirSync = () => window.dispatchEvent(new Event(EVENTO_PEDIR_SYNC))
+
 export function iniciarSyncAutomatico(aoMudar: (e: EstadoSync) => void) {
   let rodando = false
 
@@ -330,12 +340,14 @@ export function iniciarSyncAutomatico(aoMudar: (e: EstadoSync) => void) {
   const aoVoltarAoApp = () => document.visibilityState === 'visible' && rodar()
 
   window.addEventListener('online', rodar)
+  window.addEventListener(EVENTO_PEDIR_SYNC, rodar)
   document.addEventListener('visibilitychange', aoVoltarAoApp)
   const timer = setInterval(rodar, 60_000)
   void rodar()
 
   return () => {
     window.removeEventListener('online', rodar)
+    window.removeEventListener(EVENTO_PEDIR_SYNC, rodar)
     document.removeEventListener('visibilitychange', aoVoltarAoApp)
     clearInterval(timer)
   }

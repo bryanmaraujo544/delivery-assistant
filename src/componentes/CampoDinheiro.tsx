@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { formatarBRL } from '../dominio/dinheiro'
 
 interface Props {
@@ -5,6 +6,14 @@ interface Props {
   onChange: (centavos: number) => void
   id?: string
   autoFocus?: boolean
+  /**
+   * Para campo que ja abre PREENCHIDO com uma sugestao (valor recebido, parte
+   * do pagamento): ao focar, seleciona tudo, e a primeira tecla substitui.
+   *
+   * Sem isso a digitacao e ANEXADA ao que ja esta la: num campo sugerindo
+   * R$ 15,00, digitar "5000" viraria R$ 150.050,00.
+   */
+  selecionarAoFocar?: boolean
 }
 
 /**
@@ -19,7 +28,8 @@ interface Props {
  * `inputMode="numeric"` e nao "decimal": aqui so aceitamos digitos, entao um
  * teclado com virgula seria uma promessa falsa.
  */
-export function CampoDinheiro({ valorCentavos, onChange, id, autoFocus }: Props) {
+export function CampoDinheiro({ valorCentavos, onChange, id, autoFocus, selecionarAoFocar }: Props) {
+  const recemFocado = useRef(false)
   return (
     <div className="relative">
       <input
@@ -35,7 +45,17 @@ export function CampoDinheiro({ valorCentavos, onChange, id, autoFocus }: Props)
           // limite defensivo: R$ 99.999.999,99
           onChange(Math.min(Number(digitos || 0), 9_999_999_999))
         }}
-        onFocus={(e) => e.currentTarget.setSelectionRange(999, 999)}
+        onFocus={(e) => {
+          if (!selecionarAoFocar) return e.currentTarget.setSelectionRange(999, 999)
+          e.currentTarget.select()
+          recemFocado.current = true
+        }}
+        // o clique que deu o foco termina num mouseup que reposicionaria o
+        // cursor e desfaria a selecao
+        onMouseUp={(e) => {
+          if (recemFocado.current) e.preventDefault()
+          recemFocado.current = false
+        }}
         className="h-14 w-full rounded-xl border border-slate-300 px-4 text-right text-xl
                    font-semibold tabular-nums focus:border-marca-600 focus:ring-2
                    focus:ring-marca-500/30 focus:outline-none"
