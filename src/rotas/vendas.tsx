@@ -8,11 +8,12 @@ import { ehHoje, formatarDia, formatarHora, inicioDoDia, somarDias } from '../do
 import { formatarBRL } from '../dominio/dinheiro'
 import { FORMAS, ROTULO_FORMA, resumoVendas, subtotalItens } from '../dominio/venda'
 
-const MOTIVOS = ['Erro ao registrar', 'Cliente desistiu', 'Pagamento não aprovado']
+const MOTIVOS = ['Erro ao registrar', 'Venda duplicada', 'Cliente desistiu', 'Pagamento não aprovado']
 
 export function Vendas() {
   const [dia, setDia] = useState(() => inicioDoDia(Date.now()))
   const [aberta, setAberta] = useState<string | null>(null)
+  const [verExcluidas, setVerExcluidas] = useState(false)
 
   const dados = useLiveQuery(async () => {
     const vendas = await db.vendas.where('criadaEm').between(dia, somarDias(dia, 1), true, false).toArray()
@@ -23,11 +24,15 @@ export function Vendas() {
   }, [dia])
 
   const r = dados ? resumoVendas(dados.vendas) : null
+  // Excluida some da lista, mas nao do banco: fica a um toque, com hora e
+  // motivo. Venda que desaparece sem deixar rastro e o que impede de conferir
+  // o caixa depois.
+  const listadas = (dados?.vendas ?? []).filter((v) => verExcluidas || !v.canceladaEm)
   const detalhe = dados?.vendas.find((v) => v.id === aberta)
 
   return (
     <main className="mx-auto min-h-dvh max-w-3xl pb-40">
-      <header className="vidro-barra sticky top-0 z-10 px-4 pt-4 pb-3">
+      <header className="vidro sticky top-3 z-10 mx-3 mt-3 rounded-3xl px-4 pt-4 pb-3">
         <h1 className="text-2xl font-bold text-slate-900">Vendas</h1>
         <div className="mt-2 flex items-center gap-2">
           <button
@@ -105,17 +110,28 @@ export function Vendas() {
           )}
 
           <section>
-            <h2 className="px-1 pb-2 text-xs font-semibold tracking-wide text-slate-600 uppercase">
-              Todas as vendas
-              {r.quantidadeCanceladas > 0 && ` · ${r.quantidadeCanceladas} cancelada${r.quantidadeCanceladas > 1 ? 's' : ''}`}
-            </h2>
-            {dados!.vendas.length === 0 ? (
+            <div className="flex items-center justify-between px-1 pb-2">
+              <h2 className="text-xs font-semibold tracking-wide text-slate-600 uppercase">
+                Todas as vendas
+              </h2>
+              {r.quantidadeCanceladas > 0 && (
+                <button
+                  onClick={() => setVerExcluidas(!verExcluidas)}
+                  className="rounded-lg px-2 text-sm font-medium text-slate-600 underline"
+                >
+                  {verExcluidas
+                    ? 'Ocultar excluídas'
+                    : `Ver ${r.quantidadeCanceladas} excluída${r.quantidadeCanceladas > 1 ? 's' : ''}`}
+                </button>
+              )}
+            </div>
+            {listadas.length === 0 ? (
               <p className="vidro-solido rounded-2xl px-4 py-8 text-center text-slate-600">
                 Nenhuma venda {ehHoje(dia) ? 'hoje ainda' : 'neste dia'}.
               </p>
             ) : (
               <ul className="vidro-solido divide-y divide-slate-100 overflow-hidden rounded-2xl">
-                {dados!.vendas.map((v) => (
+                {listadas.map((v) => (
                   <li key={v.id}>
                     <button
                       onClick={() => setAberta(v.id)}
@@ -130,7 +146,7 @@ export function Vendas() {
                         </span>
                         <span className="block text-sm text-slate-500">
                           {v.canceladaEm
-                            ? `Cancelada: ${v.motivoCancelamento}`
+                            ? `Excluída: ${v.motivoCancelamento}`
                             : v.pagamentos.map((p) => ROTULO_FORMA[p.forma]).join(' + ') || 'Sem cobrança'}
                         </span>
                       </span>
@@ -191,7 +207,7 @@ function Detalhe({
 
   async function cancelar() {
     await cancelarVenda(venda.id, motivo)
-    mostrarAviso(`Venda de ${formatarBRL(venda.totalCentavos)} cancelada`)
+    mostrarAviso(`Venda de ${formatarBRL(venda.totalCentavos)} excluída`)
     onFechar()
   }
 
@@ -209,28 +225,28 @@ function Detalhe({
             >
               Voltar
             </button>
-            {/* botao nomeado pela acao, nunca "OK": cancelar venda nao tem desfazer */}
+            {/* botao nomeado pela acao, nunca "OK": excluir venda nao tem desfazer */}
             <button
               onClick={cancelar}
               disabled={!motivo.trim()}
               className="h-14 flex-1 rounded-2xl bg-red-600 font-semibold text-white disabled:opacity-40"
             >
-              Cancelar esta venda
+              Excluir esta venda
             </button>
           </div>
-        ) : !venda.canceladaEm && caixaAberto ? (
+        ) : !venda.canceladaEm ? (
           <button
             onClick={() => setCancelando(true)}
             className="h-14 w-full rounded-2xl border border-slate-300 font-medium text-red-700"
           >
-            Cancelar venda
+            Excluir venda
           </button>
         ) : undefined
       }
     >
       {venda.canceladaEm && (
         <p className="mb-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-900">
-          Cancelada às {formatarHora(venda.canceladaEm)}: {venda.motivoCancelamento}
+          Excluída às {formatarHora(venda.canceladaEm)}: {venda.motivoCancelamento}
         </p>
       )}
 
@@ -275,15 +291,10 @@ function Detalhe({
         )}
       </dl>
 
-      {!venda.canceladaEm && !caixaAberto && (
-        <p className="mt-4 text-sm text-slate-500">
-          O caixa desta venda já foi fechado, então ela não pode mais ser cancelada aqui.
-        </p>
-      )}
 
       {cancelando && (
         <div className="mt-4">
-          <p className="mb-2 font-medium">Por que está cancelando?</p>
+          <p className="mb-2 font-medium">Por que está excluindo?</p>
           <div className="mb-2 flex flex-wrap gap-2">
             {MOTIVOS.map((m) => (
               <button
@@ -308,8 +319,16 @@ function Detalhe({
                        focus:border-marca-600 focus:ring-2 focus:ring-marca-500/30 focus:outline-none"
           />
           <p className="mt-2 text-sm text-slate-500">
-            A venda sai do total do dia e do caixa. Devolva o dinheiro à cliente.
+            A venda sai do total do dia e do caixa. Se a cliente pagou, devolva o dinheiro.
           </p>
+          {/* depois do fechamento ainda da para corrigir um erro, mas a pessoa
+              precisa saber que o numero daquele fechamento vai mudar */}
+          {!caixaAberto && (
+            <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              O caixa desta venda já foi fechado. Excluir muda a diferença registrada naquele
+              fechamento.
+            </p>
+          )}
         </div>
       )}
     </BottomSheet>
