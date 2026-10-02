@@ -26,7 +26,7 @@ Decisões e aprendizados vão em [APRENDIZADOS.md](APRENDIZADOS.md) — aqui fic
 
 ## Onde estamos
 
-**Status: MVP do PDV pronto na branch `pdv`, ainda não mergeado em `main` nem publicado.** A v1 de precificação segue funcional por baixo.
+**Status: MVP do PDV mergeado em `main` em 01/10/2026 (PR #1), com as migrations `0005` e `0006` já no Neon.** Falta conferir o deploy em produção. A v1 de precificação segue funcional por baixo.
 
 ### MVP do PDV (branch `pdv`)
 
@@ -40,7 +40,7 @@ Decisões e aprendizados vão em [APRENDIZADOS.md](APRENDIZADOS.md) — aqui fic
 - [x] Migration `0005` aplicada no Neon em 01/10/2026 (autorizada pelo Bryan) — conferido no banco: 4 tabelas novas, 19 no total, 6 migrations registradas
 - [x] Excluir venda (some da lista, fica em "Ver N excluídas"), inclusive após o caixa fechado
 - [x] Estoque opcional por produto, com baixa na venda e devolução ao excluir
-- [ ] **Aplicar a migration `0006` (`estoque_contagem`) no Neon** ← precisa do ok do Bryan
+- [x] Migration `0006` (`estoque_contagem`) aplicada no Neon em 01/10/2026 (autorizada pelo Bryan) — conferido no banco: 20 tabelas, 7 migrations registradas
 - [ ] **Merge em `main` e deploy** ← só com ordem do Bryan. **A API sobe antes do front** (ver log)
 - [ ] Teste em aparelho real (celular Android barato: o blur do vidro pesa)
 
