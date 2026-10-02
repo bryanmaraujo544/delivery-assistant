@@ -16,8 +16,10 @@ export const OTP_MAX_TENTATIVAS = 5
  * NAO tem como se recuperar, ja que a redefinicao de senha depende de e-mail e
  * ainda nao existe.
  *
- * NAO e deslizante: a validade conta da criacao, nao do ultimo uso. Quem usa
- * todo dia ainda assim reloga a cada 90 dias.
+ * E DESLIZANTE: cada uso empurra a validade para 90 dias a frente (ver
+ * `autenticar`). Quem abre o app todo dia nunca e deslogado; a sessao so
+ * expira depois de 90 dias SEM uso, que e o caso em que o aparelho
+ * provavelmente mudou de mao.
  */
 export const SESSAO_VALIDADE_MS = 90 * 24 * 60 * 60_000
 
