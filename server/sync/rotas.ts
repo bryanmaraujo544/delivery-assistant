@@ -1,10 +1,11 @@
-import { and, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm'
+import { and, eq, gt, inArray, isNull, lt, min, sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import {
   caixaMovimento,
   caixaSessao,
   configProducao,
+  estoqueContagem,
   fichaItem,
   fichaPerda,
   fichaTecnica,
@@ -19,6 +20,7 @@ import { db } from '../db'
 import {
   num,
   zPush,
+  type ContagemEstoqueSync,
   type FichaSync,
   type InsumoSync,
   type MovimentoCaixaSync,
@@ -71,7 +73,7 @@ export async function registrarRotasSync(app: FastifyInstance) {
     if (!parse.success) {
       return reply.code(400).send({ erro: 'payload inválido', detalhe: parse.error.issues.slice(0, 5) })
     }
-    const { insumos, fichas, config, produtos, sessoes, movimentos, vendas } = parse.data
+    const { insumos, fichas, config, produtos, sessoes, movimentos, vendas, contagens } = parse.data
 
     // a aritmetica da venda e conferida aqui, com a MESMA funcao do cliente:
     // o servidor nunca grava um total so porque ele veio no corpo
@@ -112,6 +114,7 @@ export async function registrarRotasSync(app: FastifyInstance) {
       for (const s of sessoes) await gravarSessao(tx, ctx.tenantId, s)
       for (const m of movimentos) await gravarMovimento(tx, ctx.tenantId, m)
       for (const v of vendas) await gravarVenda(tx, ctx.tenantId, v)
+      for (const c of contagens) await gravarContagem(tx, ctx.tenantId, c)
     })
 
     return {
@@ -126,6 +129,7 @@ export async function registrarRotasSync(app: FastifyInstance) {
         sessoes: sessoes.length,
         movimentos: movimentos.length,
         vendas: vendas.length,
+        contagens: contagens.length,
       },
     }
   })
@@ -140,6 +144,36 @@ export async function registrarRotasSync(app: FastifyInstance) {
       parse.data.desde === 0
         ? new Date(Date.now() - JANELA_PRIMEIRO_PULL_MS)
         : new Date(parse.data.desde - FOLGA_PULL_MS)
+
+    // Contagens de estoque descem TODAS no primeiro pull: sao poucas (uma por
+    // reposicao) e o saldo depende da ultima de cada produto, por mais antiga
+    // que seja.
+    const contagensDb = await db
+      .select()
+      .from(estoqueContagem)
+      .where(
+        and(
+          eq(estoqueContagem.tenantId, ctx.tenantId),
+          gt(estoqueContagem.sincronizadoEm, parse.data.desde === 0 ? new Date(0) : desdeEventos),
+        ),
+      )
+
+    // O saldo e "ultima contagem − vendas depois dela". Se um produto foi
+    // contado ha mais tempo que a janela, as vendas desde entao precisam
+    // descer tambem — senao o aparelho novo mostraria estoque a mais.
+    let desdeVendas = desdeEventos
+    if (parse.data.desde === 0) {
+      const ultimaPorProduto = db
+        .select({ ultima: sql<Date>`max(${estoqueContagem.criadoEm})`.as('ultima') })
+        .from(estoqueContagem)
+        .where(eq(estoqueContagem.tenantId, ctx.tenantId))
+        .groupBy(estoqueContagem.produtoId)
+        .as('u')
+      const [{ maisAntiga } = { maisAntiga: null }] = await db
+        .select({ maisAntiga: min(ultimaPorProduto.ultima) })
+        .from(ultimaPorProduto)
+      if (maisAntiga && new Date(maisAntiga) < desdeVendas) desdeVendas = new Date(maisAntiga)
+    }
     const [produtosDb, sessoesDb, movimentosDb, vendasDb] = await Promise.all([
       db
         .select()
@@ -158,7 +192,13 @@ export async function registrarRotasSync(app: FastifyInstance) {
       db
         .select()
         .from(venda)
-        .where(and(eq(venda.tenantId, ctx.tenantId), gt(venda.sincronizadoEm, desdeEventos))),
+        .where(
+          and(
+            eq(venda.tenantId, ctx.tenantId),
+            // no primeiro pull o corte e pela data da VENDA; nos seguintes, pelo carimbo do servidor
+            parse.data.desde === 0 ? gt(venda.criadaEm, desdeVendas) : gt(venda.sincronizadoEm, desdeEventos),
+          ),
+        ),
     ])
 
     const [insumosDb, fichasDb, cfg] = await Promise.all([
@@ -283,6 +323,12 @@ export async function registrarRotasSync(app: FastifyInstance) {
         criadaEm: v.criadaEm.getTime(),
         canceladaEm: v.canceladaEm?.getTime() ?? null,
         motivoCancelamento: v.motivoCancelamento,
+      })),
+      contagens: contagensDb.map((c) => ({
+        id: c.id,
+        produtoId: c.produtoId,
+        quantidade: c.quantidade,
+        criadoEm: c.criadoEm.getTime(),
       })),
     }
   })
@@ -472,4 +518,17 @@ async function gravarVenda(tx: Tx, tenantId: string, v: VendaSync) {
       })
       .where(and(eq(venda.id, v.id), eq(venda.tenantId, tenantId), isNull(venda.canceladaEm)))
   }
+}
+
+async function gravarContagem(tx: Tx, tenantId: string, c: ContagemEstoqueSync) {
+  await tx
+    .insert(estoqueContagem)
+    .values({
+      id: c.id,
+      tenantId,
+      produtoId: c.produtoId,
+      quantidade: c.quantidade,
+      criadoEm: new Date(c.criadoEm),
+    })
+    .onConflictDoNothing()
 }

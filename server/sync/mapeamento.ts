@@ -132,6 +132,13 @@ export const zVenda = z.object({
   motivoCancelamento: z.string().max(200).nullish(),
 })
 
+export const zContagemEstoque = z.object({
+  id: z.uuid(),
+  produtoId: z.uuid(),
+  quantidade: z.number().int().min(0).nullable(),
+  criadoEm: z.number().int(),
+})
+
 export const zPush = z.object({
   // teto por lote: um cliente offline ha semanas nao pode derrubar o servidor
   insumos: z.array(zInsumo).max(500).default([]),
@@ -141,6 +148,7 @@ export const zPush = z.object({
   sessoes: z.array(zSessaoCaixa).max(500).default([]),
   movimentos: z.array(zMovimentoCaixa).max(500).default([]),
   vendas: z.array(zVenda).max(500).default([]),
+  contagens: z.array(zContagemEstoque).max(500).default([]),
 })
 
 export type InsumoSync = z.infer<typeof zInsumo>
@@ -149,6 +157,7 @@ export type ProdutoSync = z.infer<typeof zProduto>
 export type SessaoCaixaSync = z.infer<typeof zSessaoCaixa>
 export type MovimentoCaixaSync = z.infer<typeof zMovimentoCaixa>
 export type VendaSync = z.infer<typeof zVenda>
+export type ContagemEstoqueSync = z.infer<typeof zContagemEstoque>
 
 /** `numeric` do Postgres volta como string no driver — converter na fronteira. */
 export const num = (v: string | number | null): number | null =>

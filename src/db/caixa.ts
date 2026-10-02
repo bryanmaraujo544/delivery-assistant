@@ -81,6 +81,21 @@ export async function cancelarVenda(vendaId: string, motivo: string) {
 }
 
 /**
+ * Registra quanto ha do produto AGORA. `null` desliga o controle de estoque.
+ * Repor, corrigir e comecar a controlar sao a mesma operacao: uma contagem.
+ */
+export async function registrarContagem(produtoId: string, quantidade: number | null) {
+  await db.estoqueContagens.put({
+    id: crypto.randomUUID(),
+    produtoId,
+    quantidade,
+    criadoEm: Date.now(),
+    pendente: 1,
+  })
+  pedirSync()
+}
+
+/**
  * Custo unitario do produto pela ficha vinculada, em centavos inteiros.
  * null = sem ficha (revenda) ou ficha que nao fecha — nunca zero, porque zero
  * viraria "lucro de 100%" no relatorio.

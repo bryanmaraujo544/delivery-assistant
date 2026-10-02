@@ -1,4 +1,5 @@
 import { api, lerSessao } from '../auth/sessao'
+import type { ContagemEstoque } from '../dominio/estoque'
 import type { MovimentoCaixa, SessaoCaixa, Venda } from '../dominio/venda'
 import {
   CONFIG_PADRAO,
@@ -79,7 +80,7 @@ export async function limparDadosLocais() {
 
 /** Só o que mudou desde a última sincronização bem-sucedida. */
 async function coletarPendentes(desde: number) {
-  const [insumos, fichas, config, produtos, sessoes, movimentos, vendas] = await Promise.all([
+  const [insumos, fichas, config, produtos, sessoes, movimentos, vendas, contagens] = await Promise.all([
     db.insumos.filter((i) => i.atualizadoEm > desde).toArray(),
     db.fichas.filter((f) => f.atualizadoEm > desde).toArray(),
     db.config.get('default'),
@@ -87,8 +88,9 @@ async function coletarPendentes(desde: number) {
     db.caixaSessoes.where('pendente').equals(1).toArray(),
     db.caixaMovimentos.where('pendente').equals(1).toArray(),
     db.vendas.where('pendente').equals(1).toArray(),
+    db.estoqueContagens.where('pendente').equals(1).toArray(),
   ])
-  return { insumos, fichas, config, produtos, sessoes, movimentos, vendas }
+  return { insumos, fichas, config, produtos, sessoes, movimentos, vendas, contagens }
 }
 
 export async function contarPendentes(): Promise<number> {
@@ -99,7 +101,8 @@ export async function contarPendentes(): Promise<number> {
     p.produtos.length +
     p.sessoes.length +
     p.movimentos.length +
-    p.vendas.length
+    p.vendas.length +
+    p.contagens.length
   )
 }
 
@@ -116,9 +119,9 @@ export async function sincronizar(): Promise<{ estado: EstadoSync; enviados: num
   const desde = lerUltimoSync()
 
   try {
-    const { insumos, fichas, config, produtos, sessoes, movimentos, vendas } =
+    const { insumos, fichas, config, produtos, sessoes, movimentos, vendas, contagens } =
       await coletarPendentes(desde)
-    const fatos = sessoes.length + movimentos.length + vendas.length
+    const fatos = sessoes.length + movimentos.length + vendas.length + contagens.length
 
     if (insumos.length > 0 || fichas.length > 0 || produtos.length > 0 || fatos > 0 || desde === 0) {
       const rPush = await api('/sync/push', {
@@ -138,6 +141,7 @@ export async function sincronizar(): Promise<{ estado: EstadoSync; enviados: num
           sessoes: sessoes.map(semPendencia),
           movimentos: movimentos.map(semPendencia),
           vendas: vendas.map(semPendencia),
+          contagens: contagens.map(semPendencia),
         }),
       })
       if (!rPush.ok) throw new Error(`push falhou: ${rPush.status}`)
@@ -150,11 +154,14 @@ export async function sincronizar(): Promise<{ estado: EstadoSync; enviados: num
         (recebidos?.produtos ?? 0) !== produtos.length ||
         (recebidos?.sessoes ?? 0) !== sessoes.length ||
         (recebidos?.movimentos ?? 0) !== movimentos.length ||
-        (recebidos?.vendas ?? 0) !== vendas.length
+        (recebidos?.vendas ?? 0) !== vendas.length ||
+        (recebidos?.contagens ?? 0) !== contagens.length
       ) {
         throw new Error('servidor não confirmou o recebimento de produtos/caixa/vendas')
       }
       await confirmarFatos(sessoes, movimentos, vendas)
+      // contagem nunca muda depois de criada: basta marcar pelo id
+      await db.estoqueContagens.where('id').anyOf(contagens.map((c) => c.id)).modify({ pendente: 0 })
     }
 
     const rPull = await api(`/sync/pull?desde=${desde}`)
@@ -187,6 +194,7 @@ interface RespostaPull {
   sessoes?: SessaoCaixa[]
   movimentos?: MovimentoCaixa[]
   vendas?: Venda[]
+  contagens?: ContagemEstoque[]
 }
 
 /**
@@ -231,6 +239,9 @@ async function aplicarPull(d: RespostaPull) {
       await db.vendas.put({ ...v, pendente: 0 })
     }
   })
+
+  // contagem e imutavel: a que ja existe aqui e identica a que desce
+  await db.estoqueContagens.bulkPut((d.contagens ?? []).map((c) => ({ ...c, pendente: 0 as const })))
 
   await db.transaction('rw', db.insumos, db.fichas, db.config, db.produtos, async () => {
     for (const p of d.produtos ?? []) {

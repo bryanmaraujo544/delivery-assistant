@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { Dimensao, ItemFicha, MarkupBase, TipoPerda } from '../dominio/custo'
+import type { ContagemEstoque } from '../dominio/estoque'
 import type { MovimentoCaixa, SessaoCaixa, Venda } from '../dominio/venda'
 
 /**
@@ -135,6 +136,7 @@ interface Pendencia {
 export type VendaLocal = Venda & Pendencia
 export type SessaoCaixaLocal = SessaoCaixa & Pendencia
 export type MovimentoCaixaLocal = MovimentoCaixa & Pendencia
+export type ContagemEstoqueLocal = ContagemEstoque & Pendencia
 
 const db = new Dexie('precifica') as Dexie & {
   insumos: EntityTable<InsumoLocal, 'id'>
@@ -145,6 +147,7 @@ const db = new Dexie('precifica') as Dexie & {
   caixaSessoes: EntityTable<SessaoCaixaLocal, 'id'>
   caixaMovimentos: EntityTable<MovimentoCaixaLocal, 'id'>
   vendas: EntityTable<VendaLocal, 'id'>
+  estoqueContagens: EntityTable<ContagemEstoqueLocal, 'id'>
 }
 
 db.version(1).stores({
@@ -260,6 +263,19 @@ db.version(6).stores({
   caixaSessoes: 'id, abertaEm, pendente',
   caixaMovimentos: 'id, sessaoId, pendente',
   vendas: 'id, sessaoId, criadaEm, pendente',
+})
+
+/** v7 — contagens de estoque (o saldo e derivado delas e das vendas). */
+db.version(7).stores({
+  insumos: 'id, nomeNormalizado, categoria, favorito, excluidoEm',
+  usoInsumos: 'id, insumoId, contexto',
+  fichas: 'id, nome, categoria, ehBase, excluidoEm',
+  config: 'id',
+  produtos: 'id, nomeNormalizado, categoria, excluidoEm',
+  caixaSessoes: 'id, abertaEm, pendente',
+  caixaMovimentos: 'id, sessaoId, pendente',
+  vendas: 'id, sessaoId, criadaEm, pendente',
+  estoqueContagens: 'id, produtoId, pendente',
 })
 
 export const CONFIG_PADRAO: ConfigLocal = {

@@ -501,6 +501,32 @@ export const venda = pgTable(
   ],
 )
 
+/**
+ * Contagem de estoque: "neste momento havia N". O saldo nunca e coluna — e a
+ * ultima contagem menos as vendas posteriores (ver src/dominio/estoque.ts).
+ * `quantidade` nula significa que o produto deixou de ter estoque controlado.
+ *
+ * Sem FK para produto: a contagem pode chegar no mesmo lote que ele, e todo
+ * acesso e filtrado por tenant.
+ */
+export const estoqueContagem = pgTable(
+  'estoque_contagem',
+  {
+    id: uuid('id').primaryKey(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenant.id, { onDelete: 'cascade' }),
+    produtoId: uuid('produto_id').notNull(),
+    quantidade: integer('quantidade'),
+    criadoEm: timestamp('criado_em', { withTimezone: true }).notNull(),
+    sincronizadoEm: timestamp('sincronizado_em', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('estoque_contagem_sync_idx').on(t.tenantId, t.sincronizadoEm),
+    check('estoque_contagem_nao_negativa', sql`quantidade IS NULL OR quantidade >= 0`),
+  ],
+)
+
 /* ─────────────────────────── frecency (UX) ───────────────────────── */
 
 /**
