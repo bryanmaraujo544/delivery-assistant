@@ -38,6 +38,15 @@ export interface ItemVenda {
    * de ontem.
    */
   custoUnitarioCentavos: Centavos | null
+  /**
+   * So ingredientes e embalagens da unidade, SEM mao de obra nem rateio de
+   * custo fixo. E o que o resultado do mes subtrai: luz, aluguel e salarios
+   * ja entram la como despesa, e usar o custo cheio os contaria duas vezes.
+   *
+   * Ausente nas vendas anteriores a este campo; null quando o produto nao tem
+   * ficha nem custo informado. Nos dois casos o custo e DESCONHECIDO, nao zero.
+   */
+  custoMateriaisCentavos?: Centavos | null
 }
 
 export interface Pagamento {

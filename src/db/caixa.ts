@@ -95,20 +95,43 @@ export async function registrarContagem(produtoId: string, quantidade: number | 
   pedirSync()
 }
 
+type ProdutoComCusto = Pick<ProdutoLocal, 'fichaId' | 'custoCentavos'>
+
 /**
- * Custo unitario do produto pela ficha vinculada, em centavos inteiros.
- * null = sem ficha (revenda) ou ficha que nao fecha — nunca zero, porque zero
- * viraria "lucro de 100%" no relatorio.
+ * Custo unitario CHEIO do produto (ingredientes + mao de obra + rateio), em
+ * centavos inteiros. E o que a margem do produto e o lucro bruto do dia usam.
+ *
+ * Com ficha, vem dela. Sem ficha, vale o custo informado a mao. null = custo
+ * desconhecido — nunca zero, porque zero viraria "lucro de 100%".
  */
 export function custoDoProduto(
-  produto: Pick<ProdutoLocal, 'fichaId'>,
+  produto: ProdutoComCusto,
   catalogo: Catalogo,
   config: ConfigProducao,
 ): number | null {
-  if (!produto.fichaId || !catalogo.fichas.has(produto.fichaId)) return null
+  if (!produto.fichaId || !catalogo.fichas.has(produto.fichaId)) return produto.custoCentavos ?? null
   try {
     return arredondarCentavos(calcularCustoFicha(produto.fichaId, catalogo, config).custoUnitario)
   } catch {
     return null
   }
+}
+
+const SEM_MAO_DE_OBRA: ConfigProducao = {
+  salarioDesejadoCentavos: 0,
+  horasMes: 176,
+  custoFixoMensalCentavos: 0,
+  unidadesMes: 0,
+}
+
+/**
+ * Custo unitario so de ingredientes e embalagens — o que o resultado do mes
+ * subtrai das vendas.
+ *
+ * Calculado com mao de obra e rateio ZERADOS, e nao pegando o campo
+ * `materiais` da ficha: numa ficha com sub-receita, `materiais` ja inclui a
+ * mao de obra da massa e do recheio. Zerar a config limpa todos os niveis.
+ */
+export function custoMateriaisDoProduto(produto: ProdutoComCusto, catalogo: Catalogo): number | null {
+  return custoDoProduto(produto, catalogo, SEM_MAO_DE_OBRA)
 }

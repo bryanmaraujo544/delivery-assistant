@@ -406,6 +406,8 @@ export const produto = pgTable(
     fichaId: uuid('ficha_id'),
     /** posicao escolhida a mao na tela de venda; nulo = ainda nao arrumado */
     ordem: integer('ordem'),
+    /** custo por unidade informado a mao, para produto sem ficha (revenda) */
+    custoCentavos: integer('custo_centavos'),
     criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
     atualizadoEm: timestamp('atualizado_em', { withTimezone: true }).notNull().defaultNow(),
     excluidoEm: timestamp('excluido_em', { withTimezone: true }),
@@ -413,6 +415,7 @@ export const produto = pgTable(
   (t) => [
     index('produto_tenant_idx').on(t.tenantId),
     check('produto_preco_nao_negativo', sql`preco_centavos >= 0`),
+    check('produto_custo_nao_negativo', sql`custo_centavos IS NULL OR custo_centavos >= 0`),
   ],
 )
 

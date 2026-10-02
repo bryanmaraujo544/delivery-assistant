@@ -117,6 +117,11 @@ export interface ProdutoLocal {
   fichaId?: string | null
   /** posicao na tela de venda; ausente = ainda nao arrumado (vai para o fim) */
   ordem?: number | null
+  /**
+   * Custo por unidade informado a mao, para produto SEM ficha (refrigerante,
+   * vela). Com ficha, o custo vem dela e este campo e ignorado.
+   */
+  custoCentavos?: number | null
   atualizadoEm: number
   excluidoEm?: number | null
 }

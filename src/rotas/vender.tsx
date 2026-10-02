@@ -5,7 +5,7 @@ import { AbrirCaixa } from '../componentes/AbrirCaixa'
 import { BottomSheet } from '../componentes/BottomSheet'
 import { CampoDinheiro } from '../componentes/CampoDinheiro'
 import { EditorProduto } from '../componentes/EditorProduto'
-import { cancelarVenda, custoDoProduto, registrarVenda } from '../db/caixa'
+import { cancelarVenda, custoDoProduto, custoMateriaisDoProduto, registrarVenda } from '../db/caixa'
 import { pedirSync } from '../db/sync'
 import { montarCatalogo, paraConfigDominio } from '../db/catalogo'
 import { db, normalizar, type ProdutoLocal } from '../db/local'
@@ -102,6 +102,7 @@ export function Vender() {
         precoUnitarioCentavos: p.precoCentavos,
         quantidade: carrinho[p.id]!,
         custoUnitarioCentavos: custoDoProduto(p, dados.catalogo, dados.config),
+        custoMateriaisCentavos: custoMateriaisDoProduto(p, dados.catalogo),
       }))
   }, [dados, carrinho])
 

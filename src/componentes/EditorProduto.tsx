@@ -48,6 +48,8 @@ interface Rascunho {
   fichaId: string | null
   /** null = estoque nao controlado (encomenda, item feito na hora) */
   estoque: number | null
+  /** custo por unidade informado a mao; so vale para produto sem ficha */
+  custoCentavos: number
 }
 
 const RASCUNHO_VAZIO: Rascunho = {
@@ -57,6 +59,7 @@ const RASCUNHO_VAZIO: Rascunho = {
   categoria: '',
   fichaId: null,
   estoque: null,
+  custoCentavos: 0,
 }
 
 export function EditorProduto({
@@ -98,6 +101,7 @@ export function EditorProduto({
         categoria: produto.categoria ?? '',
         fichaId: produto.fichaId ?? null,
         estoque: dados.estoque.get(produto.id) ?? null,
+        custoCentavos: produto.custoCentavos ?? 0,
       }
     : { ...RASCUNHO_VAZIO, nome: nomeInicial }
 
@@ -114,6 +118,9 @@ export function EditorProduto({
       categoria: r.categoria.trim() || undefined,
       precoCentavos: r.precoCentavos,
       fichaId: r.fichaId,
+      // zero no campo = nao informado. Custo zero de verdade nao existe, e
+      // gravar 0 faria o produto parecer ter 100% de lucro.
+      custoCentavos: !r.fichaId && r.custoCentavos > 0 ? r.custoCentavos : null,
       atualizadoEm: Date.now(),
       excluidoEm: null,
     })
@@ -175,7 +182,7 @@ export function SeloEstoque({ quantidade }: { quantidade: number | undefined }) 
  * "margem 100%" seria mentira.
  */
 export function Margem({ precoCentavos, custoCentavos }: { precoCentavos: number; custoCentavos: number | null }) {
-  if (custoCentavos == null) return <span className="block text-xs text-slate-400">sem ficha</span>
+  if (custoCentavos == null) return <span className="block text-xs text-slate-400">sem custo</span>
   if (precoCentavos <= 0) return <span className="block text-xs text-amber-700">sem preço</span>
   const margem = ((precoCentavos - custoCentavos) / precoCentavos) * 100
   return (
@@ -207,7 +214,7 @@ function FormProduto({
 }) {
   const [r, setR] = useState(inicial)
   const ficha = fichas.find((f) => f.id === r.fichaId)
-  const custo = custoDoProduto(r, catalogo, config)
+  const custo = custoDoProduto({ fichaId: r.fichaId, custoCentavos: r.custoCentavos || null }, catalogo, config)
   const sugerido = ficha ? precoSugerido(ficha, catalogo, config) : null
 
   function escolherFicha(id: string) {
@@ -340,6 +347,25 @@ function FormProduto({
             Com a ficha, o sistema sabe o custo e mostra o lucro de cada venda.
           </p>
         </div>
+
+        {/* Revenda nao tem receita, mas tem custo: sem ele o produto entra no
+            resultado do mes como se fosse lucro puro. */}
+        {!r.fichaId && (
+          <div>
+            <label htmlFor="p-custo" className="mb-1.5 block text-sm font-medium text-slate-700">
+              Quanto custa cada unidade para você?
+            </label>
+            <CampoDinheiro
+              id="p-custo"
+              selecionarAoFocar
+              valorCentavos={r.custoCentavos}
+              onChange={(custoCentavos) => setR({ ...r, custoCentavos })}
+            />
+            <p className="mt-1.5 text-xs text-slate-500">
+              Para produto comprado pronto, como refrigerante. Deixe em R$ 0,00 se não souber.
+            </p>
+          </div>
+        )}
 
         <div>
           <label className="flex items-center gap-3 font-medium text-slate-700">

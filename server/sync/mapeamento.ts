@@ -84,6 +84,7 @@ export const zProduto = z.object({
   precoCentavos: z.number().int().min(0),
   fichaId: z.uuid().nullish(),
   ordem: z.number().int().min(0).nullish(),
+  custoCentavos: z.number().int().min(0).nullish(),
   atualizadoEm: z.number().int(),
   excluidoEm: z.number().int().nullish(),
 })
@@ -120,6 +121,7 @@ export const zVenda = z.object({
         precoUnitarioCentavos: z.number().int().min(0),
         quantidade: z.number().int().positive(),
         custoUnitarioCentavos: z.number().int().min(0).nullable(),
+        custoMateriaisCentavos: z.number().int().min(0).nullish(),
       }),
     )
     .min(1)

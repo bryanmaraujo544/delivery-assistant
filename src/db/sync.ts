@@ -326,6 +326,7 @@ const paraEnvioProduto = (p: ProdutoLocal) => ({
   precoCentavos: p.precoCentavos,
   fichaId: p.fichaId ?? null,
   ordem: p.ordem ?? null,
+  custoCentavos: p.custoCentavos ?? null,
   atualizadoEm: p.atualizadoEm,
   excluidoEm: p.excluidoEm ?? null,
 })
