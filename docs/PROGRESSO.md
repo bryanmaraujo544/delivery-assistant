@@ -37,7 +37,7 @@ Decisões e aprendizados vão em [APRENDIZADOS.md](APRENDIZADOS.md) — aqui fic
 - [x] Venda: produtos → cobrar → forma de pagamento; troco, desconto, pagamento dividido, desfazer
 - [x] Vendas: resumo do dia, mais vendidos, histórico, cancelamento com motivo
 - [x] Sincronização de produtos, caixa e vendas (fatos idempotentes)
-- [ ] **Aplicar a migration `0005` no Neon** ← precisa do ok do Bryan (é o banco de produção)
+- [x] Migration `0005` aplicada no Neon em 01/10/2026 (autorizada pelo Bryan) — conferido no banco: 4 tabelas novas, 19 no total, 6 migrations registradas
 - [ ] **Merge em `main` e deploy** ← só com ordem do Bryan. **A API sobe antes do front** (ver log)
 - [ ] Teste em aparelho real (celular Android barato: o blur do vidro pesa)
 
@@ -552,7 +552,7 @@ rodando um app velho depois do deploy, sem forma de sair.
 **Limitação desta sessão:** o Bryan pediu verificação com Claude in Chrome, mas a extensão não estava conectada. A verificação foi feita com Chromium headless e screenshots. Vale repetir no Chrome real e em aparelho físico.
 
 **Pendências abertas:**
-- Aplicar a `0005` no Neon e publicar — **API antes do front**. O front novo recusa dar por sincronizado o que um servidor antigo não confirma, então nada se perde, mas a tela fica mostrando erro de sincronização até a API subir
+- Publicar (a `0005` já está no Neon) — **API antes do front**. O front novo recusa dar por sincronizado o que um servidor antigo não confirma, então nada se perde, mas a tela fica mostrando erro de sincronização até a API subir
 - **Brecha pré-existente em `gravarInsumo`/`gravarFicha`** (`server/sync/rotas.ts`): o `onConflictDoUpdate` não filtra por tenant e o `set` inclui `tenantId`. Quem acertasse o UUID de um insumo de outra conta o sobrescreveria e o levaria para a própria. Exige adivinhar um UUID, mas é falha de isolamento. As tabelas novas já filtram; as antigas não foram tocadas
 - O nome "Precifica" (barra lateral, login, manifest do PWA) não descreve mais o produto
 - Cor da marca mudou de verde-água para um tom de frutas vermelhas — escolha minha, fácil de trocar em `--color-marca-*`
