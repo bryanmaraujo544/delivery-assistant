@@ -1,15 +1,18 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type PointerEvent } from 'react'
 import { Link } from 'react-router'
 import { AbrirCaixa } from '../componentes/AbrirCaixa'
 import { BottomSheet } from '../componentes/BottomSheet'
 import { CampoDinheiro } from '../componentes/CampoDinheiro'
+import { EditorProduto } from '../componentes/EditorProduto'
 import { cancelarVenda, custoDoProduto, registrarVenda } from '../db/caixa'
+import { pedirSync } from '../db/sync'
 import { montarCatalogo, paraConfigDominio } from '../db/catalogo'
 import { db, normalizar, type ProdutoLocal } from '../db/local'
 import { ehHoje, formatarDia } from '../dominio/datas'
 import { formatarBRL } from '../dominio/dinheiro'
 import { estoqueAtual } from '../dominio/estoque'
+import { moverPara, ordenarProdutos } from '../dominio/ordem'
 import {
   FORMAS,
   ROTULO_FORMA,
@@ -64,6 +67,11 @@ export function Vender() {
   const [pedidoAberto, setPedidoAberto] = useState(false)
   const [cobrando, setCobrando] = useState(false)
   const [concluida, setConcluida] = useState<{ venda: Venda; carrinho: Carrinho } | null>(null)
+  /** modo de arrumar a tela: arrastar os cartoes e editar produtos */
+  const [organizando, setOrganizando] = useState(false)
+  /** ordem em edicao (ids), enquanto se arrasta; null fora do modo de arrumar */
+  const [ordemLocal, setOrdemLocal] = useState<string[] | null>(null)
+  const [editando, setEditando] = useState<string | null>(null)
 
   const dados = useLiveQuery(async () => {
     const [produtos, fichas, insumos, config, sessoes, contagens, vendas] = await Promise.all([
@@ -76,7 +84,7 @@ export function Vender() {
       db.vendas.toArray(),
     ])
     return {
-      produtos: produtos.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
+      produtos: ordenarProdutos(produtos),
       catalogo: montarCatalogo(insumos, fichas),
       config: paraConfigDominio(config),
       sessao: sessoes.sort((a, b) => b.abertaEm - a.abertaEm)[0],
@@ -159,6 +167,30 @@ export function Vender() {
     (p) => (!categoria || p.categoria === categoria) && p.nomeNormalizado.includes(buscaNorm),
   )
 
+  // Arrumar e sempre sobre a lista INTEIRA: reordenar dentro de um filtro
+  // deixaria ambigua a posicao em relacao aos produtos escondidos.
+  const porId = new Map(dados.produtos.map((p) => [p.id, p]))
+  const emArrumacao = (ordemLocal ?? dados.produtos.map((p) => p.id))
+    .map((id) => porId.get(id))
+    .filter((p) => p !== undefined)
+
+  function alternarOrganizar() {
+    setOrdemLocal(organizando ? null : dados!.produtos.map((p) => p.id))
+    setOrganizando(!organizando)
+  }
+
+  /** Grava a posicao de quem mudou de lugar. Roda ao soltar o cartao. */
+  async function salvarOrdem(ids: string[]) {
+    const agora = Date.now()
+    const mudaram = ids
+      .map((id, ordem) => ({ produto: porId.get(id), ordem }))
+      .filter((x) => x.produto && x.produto.ordem !== x.ordem)
+      .map((x) => ({ ...x.produto!, ordem: x.ordem, atualizadoEm: agora }))
+    if (mudaram.length === 0) return
+    await db.produtos.bulkPut(mudaram)
+    pedirSync()
+  }
+
   const pedido = (
     <Pedido
       itens={itens}
@@ -176,7 +208,26 @@ export function Vender() {
     <main className="min-h-dvh lg:flex lg:h-dvh lg:gap-4 lg:p-3">
       <section className="flex min-w-0 flex-1 flex-col pb-52 lg:overflow-y-auto lg:pb-4">
         <header className="vidro sticky top-3 z-10 mx-3 mt-3 rounded-3xl px-4 pt-4 pb-3 lg:mx-0 lg:mt-0 lg:top-0">
-          <h1 className="text-2xl font-bold text-slate-900">Vender</h1>
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-2xl font-bold text-slate-900">{organizando ? 'Arrumar a tela' : 'Vender'}</h1>
+            {dados.produtos.length > 0 && (
+              <button
+                onClick={alternarOrganizar}
+                aria-pressed={organizando}
+                className={`flex items-center gap-2 rounded-full px-4 font-medium ${
+                  organizando ? 'bg-marca-600 text-white' : 'bg-white/70 text-slate-700'
+                }`}
+              >
+                {!organizando && <IconeLapis />}
+                {organizando ? 'Concluir' : 'Arrumar'}
+              </button>
+            )}
+          </div>
+          {organizando && (
+            <p className="mt-1 text-sm text-slate-600">
+              Arraste pela alça para mudar a posição. Toque no lápis para editar o produto.
+            </p>
+          )}
           {!ehHoje(dados.sessao.abertaEm) && (
             <p className="mt-1 text-sm text-amber-800">
               O caixa está aberto desde {formatarDia(dados.sessao.abertaEm)}.{' '}
@@ -185,7 +236,7 @@ export function Vender() {
               </Link>
             </p>
           )}
-          {dados.produtos.length > 12 && (
+          {!organizando && dados.produtos.length > 12 && (
             <input
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
@@ -195,7 +246,7 @@ export function Vender() {
                          focus:border-marca-600 focus:ring-2 focus:ring-marca-500/30 focus:outline-none"
             />
           )}
-          {categorias.length > 1 && (
+          {!organizando && categorias.length > 1 && (
             <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
               {[null, ...categorias].map((c) => (
                 <button
@@ -225,8 +276,18 @@ export function Vender() {
               Cadastrar produtos
             </Link>
           </div>
+        ) : organizando ? (
+          <GradeArrumar
+            produtos={emArrumacao}
+            estoque={dados.estoque}
+            onMover={(id, alvoId) =>
+              setOrdemLocal((o) => moverPara(o ?? dados.produtos.map((p) => p.id), id, alvoId))
+            }
+            onSoltar={() => ordemLocal && salvarOrdem(ordemLocal)}
+            onEditar={setEditando}
+          />
         ) : (
-          <ul className="grid grid-cols-2 gap-3 px-4 pt-4 sm:grid-cols-3 xl:grid-cols-4">
+          <ul className={GRADE}>
             {visiveis.map((p) => (
               <BotaoProduto
                 key={p.id}
@@ -234,6 +295,7 @@ export function Vender() {
                 quantidade={carrinho[p.id] ?? 0}
                 estoque={dados.estoque.get(p.id)}
                 onToque={() => alterar(p.id, 1)}
+                onEditar={() => setEditando(p.id)}
               />
             ))}
           </ul>
@@ -266,6 +328,7 @@ export function Vender() {
         </BottomSheet>
       </div>
 
+      {editando && <EditorProduto produtoId={editando} onFechar={() => setEditando(null)} />}
       {cobrando && <Cobranca total={total} onFechar={() => setCobrando(false)} onConcluir={concluir} />}
       {concluida && (
         <Concluida venda={concluida.venda} onNova={() => setConcluida(null)} onDesfazer={desfazer} />
@@ -274,57 +337,194 @@ export function Vender() {
   )
 }
 
+const GRADE = 'grid grid-cols-2 gap-3 px-4 pt-4 sm:grid-cols-3 xl:grid-cols-4'
+
+function IconeLapis() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />
+    </svg>
+  )
+}
+
+/** Faixa "Sem estoque": a mesma na venda e na arrumacao. */
+function FaixaSemEstoque() {
+  return (
+    <span className="shrink-0 rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold whitespace-nowrap text-white uppercase">
+      Sem estoque
+    </span>
+  )
+}
+
 /**
- * Produto sem estoque continua vendavel, so avisa. Se o bolo esta na vitrine
- * e o sistema diz zero, quem esta errado e o sistema — travar a venda no
- * balcao por causa de uma contagem desatualizada seria pior que o furo.
+ * Produto sem estoque continua vendavel, so avisa — e ganha um lapis para
+ * repor dali mesmo. Se o bolo esta na vitrine e o sistema diz zero, quem esta
+ * errado e o sistema: travar a venda no balcao por causa de uma contagem
+ * desatualizada seria pior que o furo.
  */
 function BotaoProduto({
   produto,
   quantidade,
   estoque,
   onToque,
+  onEditar,
 }: {
   produto: ProdutoLocal
   quantidade: number
   /** undefined = estoque nao controlado */
   estoque: number | undefined
   onToque: () => void
+  onEditar: () => void
 }) {
   // ja descontando o que esta no pedido em andamento
   const restam = estoque === undefined ? undefined : estoque - quantidade
+  const semEstoque = estoque !== undefined && estoque <= 0
   return (
-    <li>
+    // O lapis e IRMAO do botao de venda, nao filho: <button> dentro de <button>
+    // e HTML invalido e o navegador decide sozinho quem recebe o toque.
+    <li className="relative">
       <button
         onClick={onToque}
         className={`vidro-cartao relative flex h-28 w-full flex-col justify-between rounded-2xl p-3 text-left
                     transition-transform active:scale-95 ${quantidade > 0 ? 'ring-2 ring-marca-500' : ''}`}
       >
-        <span className="line-clamp-2 leading-tight font-semibold">{produto.nome}</span>
+        <span className={`line-clamp-2 leading-tight font-semibold ${semEstoque ? 'pr-11 text-slate-500' : ''}`}>
+          {produto.nome}
+        </span>
         <span className="flex items-end justify-between gap-2">
-          <span className="text-lg font-bold tabular-nums text-marca-700">
+          <span className={`text-lg font-bold tabular-nums ${semEstoque ? 'text-slate-500' : 'text-marca-700'}`}>
             {formatarBRL(produto.precoCentavos)}
           </span>
-          {restam !== undefined && (
-            <span
-              className={`text-xs font-semibold ${
-                restam < 0 ? 'text-red-700' : restam <= 3 ? 'text-amber-700' : 'text-slate-500'
-              }`}
-            >
-              {restam < 0 ? `faltam ${-restam}` : restam === 0 ? 'acabou' : `restam ${restam}`}
-            </span>
+          {semEstoque ? (
+            <FaixaSemEstoque />
+          ) : (
+            restam !== undefined && (
+              <span className={`text-xs font-semibold ${restam <= 3 ? 'text-amber-700' : 'text-slate-500'}`}>
+                {restam < 0 ? `faltam ${-restam}` : restam === 0 ? 'acabou' : `restam ${restam}`}
+              </span>
+            )
           )}
         </span>
         {quantidade > 0 && (
           <span
-            className="absolute -top-2 -right-2 flex h-8 min-w-8 items-center justify-center rounded-full
+            className="absolute -top-2 -left-2 flex h-8 min-w-8 items-center justify-center rounded-full
                        bg-marca-600 px-2 font-bold text-white shadow"
           >
             {quantidade}
           </span>
         )}
       </button>
+      {semEstoque && (
+        <button
+          onClick={onEditar}
+          aria-label={`Editar ${produto.nome}`}
+          title="Editar produto"
+          className="absolute top-1 right-1 flex w-12 items-center justify-center rounded-xl text-slate-600 hover:bg-white/70"
+        >
+          <IconeLapis />
+        </button>
+      )}
     </li>
+  )
+}
+
+/**
+ * Grade no modo de arrumar. Aqui o cartao NAO vende: tocar nele sem querer
+ * enquanto se arrasta nao pode por bolo no pedido.
+ *
+ * Arrasto por ponteiro (mouse e dedo no mesmo codigo), so pela alca: assim o
+ * resto do cartao continua rolando a pagina no celular. Ao passar por cima de
+ * outro cartao, o arrastado toma o lugar dele na hora — a pessoa ve a grade
+ * se rearrumando, em vez de adivinhar onde vai cair.
+ */
+function GradeArrumar({
+  produtos,
+  estoque,
+  onMover,
+  onSoltar,
+  onEditar,
+}: {
+  produtos: ProdutoLocal[]
+  estoque: Map<string, number>
+  onMover: (id: string, alvoId: string) => void
+  onSoltar: () => void
+  onEditar: (id: string) => void
+}) {
+  const [arrastando, setArrastando] = useState<string | null>(null)
+
+  function mover(e: PointerEvent<HTMLButtonElement>) {
+    if (!arrastando) return
+    const alvo = document
+      .elementFromPoint(e.clientX, e.clientY)
+      ?.closest<HTMLElement>('[data-produto]')?.dataset.produto
+    if (alvo && alvo !== arrastando) onMover(arrastando, alvo)
+
+    // rola quando o dedo chega perto da borda — no desktop quem rola e a
+    // coluna de produtos; no celular, a pagina
+    const passo = e.clientY > innerHeight - 90 ? 14 : e.clientY < 150 ? -14 : 0
+    if (passo) {
+      e.currentTarget.closest('section')?.scrollBy(0, passo)
+      scrollBy(0, passo)
+    }
+  }
+
+  function soltar() {
+    if (!arrastando) return
+    setArrastando(null)
+    onSoltar()
+  }
+
+  return (
+    <ul className={GRADE}>
+      {produtos.map((p) => {
+        const q = estoque.get(p.id)
+        return (
+          <li
+            key={p.id}
+            data-produto={p.id}
+            className={`vidro-cartao flex h-28 overflow-hidden rounded-2xl transition-shadow ${
+              arrastando === p.id ? 'scale-105 opacity-80 ring-2 ring-marca-500' : ''
+            }`}
+          >
+            <button
+              aria-label={`Arrastar ${p.nome}`}
+              // sem isto o navegador interpreta o arrasto do dedo como rolagem
+              style={{ touchAction: 'none' }}
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId)
+                setArrastando(p.id)
+              }}
+              onPointerMove={mover}
+              onPointerUp={soltar}
+              onPointerCancel={soltar}
+              className="flex w-9 shrink-0 cursor-grab items-center justify-center bg-white/40 text-slate-500 active:cursor-grabbing"
+            >
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor" aria-hidden="true">
+                <circle cx="9" cy="6" r="1.6" /><circle cx="15" cy="6" r="1.6" />
+                <circle cx="9" cy="12" r="1.6" /><circle cx="15" cy="12" r="1.6" />
+                <circle cx="9" cy="18" r="1.6" /><circle cx="15" cy="18" r="1.6" />
+              </svg>
+            </button>
+            <div className="flex min-w-0 flex-1 flex-col justify-between py-3 pl-2">
+              <span className="line-clamp-2 text-sm leading-tight font-semibold break-words">{p.nome}</span>
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="font-bold tabular-nums text-marca-700">{formatarBRL(p.precoCentavos)}</span>
+                {q !== undefined &&
+                  (q <= 0 ? <FaixaSemEstoque /> : <span className="text-xs text-slate-500">{q} em estoque</span>)}
+              </span>
+            </div>
+            <button
+              onClick={() => onEditar(p.id)}
+              aria-label={`Editar ${p.nome}`}
+              title="Editar produto"
+              className="flex w-10 shrink-0 items-start justify-center pt-3 text-slate-600 hover:bg-white/50"
+            >
+              <IconeLapis />
+            </button>
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 
