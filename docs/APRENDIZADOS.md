@@ -318,6 +318,20 @@ Depois de conferir, a conta aparece **linha a linha** (troco inicial + vendas em
 
 "Sangria" e "suprimento" são jargão. Os botões dizem **"Retirar dinheiro"** e **"Colocar dinheiro"**, com o termo técnico só como legenda.
 
+### [2026-10-01] Excluir venda: some da lista, não do registro
+
+Pedido do Bryan depois de testar: precisa dar para excluir uma venda, porque erro acontece. Para quem opera, é **"Excluir venda"**; por baixo continua sendo o cancelamento (um fato com hora e motivo), e a venda excluída fica fora da lista, a um toque em "Ver N excluídas".
+
+Venda que desaparece sem rastro é exatamente o que impede de conferir o caixa depois — por isso não existe delete de verdade.
+
+**Revoga** a regra da primeira versão, que só deixava cancelar com o caixa aberto: erro também se descobre no dia seguinte. Agora dá para excluir depois do fechamento, com aviso de que a diferença registrada naquele fechamento muda.
+
+### [2026-10-01] Feedback visual do Bryan na primeira rodada
+
+- **Botão sem `cursor: pointer`.** O reset do Tailwind 4 deixa `<button>` com a seta padrão. No desktop a mãozinha é o que diz "isto é clicável". Corrigido uma vez só, na camada base
+- **Primeiro fundo ficou branco demais** ("cara simplista"): sobre fundo quase branco, vidro é só cartão branco. A primeira correção exagerou para um rosa saturado, com cara de chiclete. O ponto certo foi um degradê claro com manchas de croma contido (≤ 0,11) e um grão leve contra banding
+- **Cabeçalho em faixa reta** ficava feio: um retângulo de borda dura, mais estreito que a janela, boiando no papel de parede. Virou placa de vidro flutuante e arredondada, como a barra lateral
+
 ### [2026-10-01] Liquid glass: vidro na moldura, sólido no conteúdo
 
 - **Vidro** (`vidro`, `vidro-barra`): navegação, cabeçalhos, painel do pedido
