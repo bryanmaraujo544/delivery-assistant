@@ -16,6 +16,9 @@ interface Props {
  * O sheet nasce na base, onde o polegar ja esta, e o teclado abre logo abaixo
  * do campo em foco. Modal central obriga a esticar a mao; pagina nova faz
  * perder o contexto da lista.
+ *
+ * No desktop nao existe polegar: a partir de `lg` o mesmo componente vira um
+ * dialogo centralizado.
  */
 export function BottomSheet({ aberto, titulo, onFechar, children, rodape }: Props) {
   useEffect(() => {
@@ -32,9 +35,9 @@ export function BottomSheet({ aberto, titulo, onFechar, children, rodape }: Prop
   if (!aberto) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center lg:items-center lg:p-6">
       <div
-        className="absolute inset-0 bg-slate-900/40"
+        className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm"
         onClick={onFechar}
         aria-hidden="true"
       />
@@ -42,7 +45,7 @@ export function BottomSheet({ aberto, titulo, onFechar, children, rodape }: Prop
         role="dialog"
         aria-modal="true"
         aria-label={titulo}
-        className="relative flex max-h-[92vh] w-full max-w-md flex-col rounded-t-3xl bg-white shadow-2xl"
+        className="vidro-folha relative flex max-h-[92vh] w-full max-w-md flex-col rounded-t-3xl shadow-2xl lg:rounded-3xl"
       >
         <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <h2 className="text-lg font-semibold">{titulo}</h2>

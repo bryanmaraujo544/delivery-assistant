@@ -1,27 +1,155 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-marca-50: oklch(0.98 0.02 180);
-  --color-marca-500: oklch(0.6 0.11 180);
-  --color-marca-600: oklch(0.52 0.1 180);
-  --color-marca-700: oklch(0.44 0.09 180);
+  --color-marca-50: oklch(0.97 0.02 5);
+  --color-marca-500: oklch(0.64 0.19 5);
+  --color-marca-600: oklch(0.56 0.19 5);
+  --color-marca-700: oklch(0.47 0.16 5);
+
+  /* As sombras padrao do Tailwind sao pretas e fortes; sobre o papel de parede
+     claro ficam pesadas. Estas sao largas, fracas e puxadas para o violeta. */
+  --shadow-sm: 0 1px 2px rgb(70 40 110 / 0.08);
+  --shadow: 0 2px 6px -2px rgb(70 40 110 / 0.14);
+  --shadow-lg: 0 8px 20px -12px rgb(70 40 110 / 0.28);
+  --shadow-xl: 0 10px 24px -12px rgb(70 40 110 / 0.3);
+  --shadow-2xl: 0 20px 48px -20px rgb(70 40 110 / 0.32);
 }
 
-/* Contexto de uso: cozinha. Mao suja, pressa, tela possivelmente molhada.
-   Alvo minimo 48px (acima dos 44px de Apple/Google) e area de toque generosa. */
+/* Espaco ocupado pela navegacao. Tudo que e `fixed` (botao de acao, snackbar)
+   se posiciona por estas variaveis, para nao ficar atras da barra no celular
+   nem descentralizado ao lado da barra lateral no desktop. */
+:root {
+  --nav-h: 5.25rem;
+  --nav-w: 0rem;
+}
+@media (width >= 64rem) {
+  :root {
+    --nav-h: 0rem;
+    --nav-w: 16rem;
+  }
+}
+
+/* Contexto de uso: cozinha e balcao. Mao suja, pressa, tela possivelmente
+   molhada. Alvo minimo 48px (acima dos 44px de Apple/Google). */
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
   }
   body {
-    @apply bg-white text-slate-900 antialiased;
+    @apply text-slate-900 antialiased;
+    background-color: oklch(0.9 0.045 340);
     /* respeita a safe area do iPhone em modo standalone */
     padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* O vidro so "le" como vidro se houver cor atras dele. O fundo fica num
+     pseudo-elemento fixo: `background-attachment: fixed` no body engasga a
+     rolagem em Android barato. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    /* Papel de parede com cor de verdade: sobre um fundo quase branco o vidro
+       vira so um cartao branco. Manchas grandes de cor dao o que refratar — mas
+       contidas: saturado demais vira chiclete e cansa quem olha o dia inteiro;
+       o grao por cima quebra o "banding" do degrade em monitor comum. */
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+      radial-gradient(46rem 34rem at 8% 0%, oklch(0.82 0.11 10 / 0.75), transparent 70%),
+      radial-gradient(40rem 32rem at 96% 2%, oklch(0.88 0.09 70 / 0.8), transparent 70%),
+      radial-gradient(52rem 40rem at 92% 100%, oklch(0.76 0.11 285 / 0.75), transparent 70%),
+      radial-gradient(44rem 36rem at 0% 100%, oklch(0.84 0.08 220 / 0.7), transparent 70%),
+      linear-gradient(160deg, oklch(0.94 0.03 60), oklch(0.9 0.045 340) 50%, oklch(0.86 0.06 285));
   }
   button,
   [role='button'],
   a {
     min-height: 48px;
     touch-action: manipulation;
+  }
+  /* O reset do Tailwind 4 deixa <button> com a seta padrao. No desktop, a
+     maozinha e o que diz "isto e clicavel". */
+  button:not(:disabled),
+  [role='button'],
+  select,
+  summary,
+  label[for] {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+/* ───────────────────────── liquid glass ─────────────────────────
+   Densidades do mesmo vidro: `vidro` (moldura: navegacao, paineis),
+   `vidro-barra` (faixa colada na borda), `vidro-cartao` (conteudo) e
+   `vidro-folha` (dialogos e sheets). */
+
+@utility vidro {
+  background: linear-gradient(145deg, rgb(255 255 255 / 0.58), rgb(255 255 255 / 0.28));
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  border: 1px solid rgb(255 255 255 / 0.55);
+  /* A espessura da placa vem do brilho na aresta de cima, nao de sombra
+     escura: sombra forte sobre fundo claro fica pesada e suja. A externa e
+     larga, bem transparente e levemente violeta, da cor do papel de parede. */
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.95),
+    inset 0 0 0 1px rgb(255 255 255 / 0.18),
+    0 12px 32px -18px rgb(70 40 110 / 0.22);
+}
+
+/* Barra colada na borda (cabecalho sticky): mesmo vidro, sem elevacao. */
+@utility vidro-barra {
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.62), rgb(255 255 255 / 0.42));
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  border-bottom: 1px solid rgb(255 255 255 / 0.6);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9);
+}
+
+/* Cartao de CONTEUDO: tambem e vidro, so mais leitoso que a moldura.
+   Ja foi quase opaco (branco a 90%), por medo de dinheiro ficar ilegivel sobre
+   fundo translucido. Com o papel de parede claro e de croma contido, o texto
+   escuro mantem contraste alto em qualquer ponto — e o cartao branco chapado
+   destoava do resto. O blur e menor que o da moldura porque uma tela pode ter
+   dezenas destes (grade de produtos). */
+@utility vidro-cartao {
+  background: linear-gradient(160deg, rgb(255 255 255 / 0.62), rgb(255 255 255 / 0.38));
+  backdrop-filter: blur(16px) saturate(170%);
+  -webkit-backdrop-filter: blur(16px) saturate(170%);
+  border: 1px solid rgb(255 255 255 / 0.65);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.95),
+    0 6px 18px -12px rgb(70 40 110 / 0.16);
+}
+
+/* Dialogo e bottom sheet: o mais denso. Tem formulario dentro e fica sobre a
+   tela escurecida, entao precisa de mais leite para os campos lerem bem. */
+@utility vidro-folha {
+  background: linear-gradient(160deg, rgb(255 255 255 / 0.9), rgb(255 255 255 / 0.76));
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgb(255 255 255 / 0.7);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.95);
+}
+
+/* Quem pede menos transparencia no sistema, ou navegador sem backdrop-filter,
+   recebe superficie opaca: legibilidade vem antes do efeito. */
+@media (prefers-reduced-transparency: reduce) {
+  .vidro,
+  .vidro-barra,
+  .vidro-cartao {
+    background: rgb(255 255 255 / 0.96);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .vidro,
+  .vidro-barra,
+  .vidro-cartao {
+    background: rgb(255 255 255 / 0.96);
   }
 }

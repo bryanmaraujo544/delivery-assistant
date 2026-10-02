@@ -9,9 +9,13 @@ Decisões e aprendizados vão em [APRENDIZADOS.md](APRENDIZADOS.md) — aqui fic
 
 ## Onde queremos chegar
 
-**Produto:** SaaS de precificação e custo para confeitaria artesanal (bolos, doces de festa, bolo no pote).
+**Produto (desde 01/10/2026):** sistema completo para a boleira operar a **loja física e o delivery**. O centro é o **PDV** — produtos, venda, caixa. A precificação (insumos, fichas, custo) continua inteira, mas virou **um módulo** ("Custos"), não o produto.
 
-**Promessa:**
+**Primeira loja:** Loja Monica Bolos.
+
+**Fora de escopo, por decisão do Bryan:** emissão fiscal (NFC-e).
+
+**Promessa do módulo de custos (continua valendo):**
 > Você atualiza o preço do insumo em um lugar, e o custo de todos os produtos que o usam se atualiza sozinho.
 
 **Modelo:** assinatura multi-tenant, com suporte a **contas isentas** (teste, parceiros, suporte, uso interno).
@@ -22,7 +26,29 @@ Decisões e aprendizados vão em [APRENDIZADOS.md](APRENDIZADOS.md) — aqui fic
 
 ## Onde estamos
 
-**Status: v1 funcional ponta a ponta — login, catálogo, fichas, cálculo de custo e sincronização com o Postgres.**
+**Status: MVP do PDV mergeado em `main` em 01/10/2026 (PR #1), com as migrations `0005` e `0006` já no Neon.** Falta conferir o deploy em produção. A v1 de precificação segue funcional por baixo.
+
+### MVP do PDV (branch `pdv`)
+
+- [x] Identidade liquid glass + shell responsivo (barra lateral no desktop, barra na base no celular)
+- [x] Regras puras de venda e caixa (18 testes)
+- [x] Produtos de venda, com vínculo opcional à ficha técnica
+- [x] Caixa: abertura, retirada/entrada de dinheiro, fechamento com contagem cega
+- [x] Venda: produtos → cobrar → forma de pagamento; troco, desconto, pagamento dividido, desfazer
+- [x] Vendas: resumo do dia, mais vendidos, histórico, cancelamento com motivo
+- [x] Sincronização de produtos, caixa e vendas (fatos idempotentes)
+- [x] Migration `0005` aplicada no Neon em 01/10/2026 (autorizada pelo Bryan) — conferido no banco: 4 tabelas novas, 19 no total, 6 migrations registradas
+- [x] Excluir venda (some da lista, fica em "Ver N excluídas"), inclusive após o caixa fechado
+- [x] Estoque opcional por produto, com baixa na venda e devolução ao excluir
+- [x] Migration `0006` (`estoque_contagem`) aplicada no Neon em 01/10/2026 (autorizada pelo Bryan) — conferido no banco: 20 tabelas, 7 migrations registradas
+- [ ] **Merge em `main` e deploy** ← só com ordem do Bryan. **A API sobe antes do front** (ver log)
+- [ ] Teste em aparelho real (celular Android barato: o blur do vidro pesa)
+
+### Depois do MVP (ordem sugerida, não iniciado)
+
+Encomendas com sinal e data de entrega · pedidos de delivery (canal, taxa, status) · operadores com PIN · venda por peso/fatia · comprovante por WhatsApp · vitrine do dia (produção, sobras) · clientes e fiado · impressora térmica.
+
+### v1 de precificação
 
 - [x] Pesquisa de domínio (precificação de confeitaria BR)
 - [x] Análise competitiva
@@ -493,3 +519,44 @@ rodando um app velho depois do deploy, sem forma de sair.
 **Pendências abertas:**
 - Renomear o repositório: `delivery-assistant` não tem relação com o produto
 - Fechar as lacunas de [APRENDIZADOS.md § G](APRENDIZADOS.md#g-não-apurado--não-trate-como-fato), com prioridade para **MEI e rotulagem** antes de qualquer feature de etiqueta
+
+### 2026-10-01 — Virada para PDV: MVP da loja física
+
+**Decidido com o Bryan:** o sistema passa a ser o software da loja inteira; precificação vira módulo. Sem parte fiscal. Conta única no MVP (operadores com PIN ficam para depois). Primeira loja: Monica Bolos. Todo o trabalho na branch `pdv`, merge em `main` só quando estiver pronto.
+
+**Feito (8 commits na `pdv`):**
+- `src/app.css` — tokens de vidro (`vidro`, `vidro-barra`, `vidro-solido`), fundo em gradiente, variáveis `--nav-h`/`--nav-w`
+- `src/componentes/Navegacao.tsx` substitui `NavInferior`
+- `src/dominio/venda.ts` (+ testes) — total, troco, validação, resumo de caixa, resumo de vendas
+- `src/db/caixa.ts` — única porta de escrita de caixa e venda
+- Dexie v6; migration `0005` (4 tabelas: `produto`, `caixa_sessao`, `caixa_movimento`, `venda`)
+- Rotas `/vender` (nova tela inicial), `/caixa`, `/vendas`, `/produtos`
+
+**Verificado rodando** (Chromium headless em 1440×900 e 390×844, contra a API local e um Postgres descartável em Docker — **não** contra o Neon):
+
+| Cenário | Resultado |
+|---|---|
+| Venda em dinheiro, R$ 34,50 pagos com R$ 50 | troco R$ 15,50, gravado |
+| Pix em dois toques | ok |
+| Pagamento dividido (R$ 5 dinheiro + R$ 10 Pix) | dois pagamentos na mesma venda |
+| Desfazer logo após a venda | venda cancelada, pedido volta para a tela |
+| Cancelar com motivo | sai do total do dia e do caixa |
+| Sangria de R$ 20 + fechamento contando R$ 119,00 | esperado R$ 119,50 → "Faltou R$ 0,50" |
+| Segundo aparelho (celular) logando na mesma conta | produtos, vendas e fechamento descem |
+| **Venda com o navegador offline** | fecha; servidor 5 → 5; ao voltar a rede 5 → 6; novo sync continua 6 |
+| Produto criado a partir de ficha | "custo R$ 0,35 · margem 59,8%" e custo gravado na venda |
+| API: 16 cenários (idempotência, total adulterado, isolamento entre contas) | todos passam |
+
+**Bugs pegos rodando:**
+- **Campo de dinheiro pré-preenchido anexava a digitação.** Num campo sugerindo R$ 15,00, digitar `5000` virava R$ 150.050,00. Apareceu porque o teste automatizado não conseguia dividir um pagamento. Corrigido com `selecionarAoFocar`
+- **Troco abaixo da dobra no celular** na tela de cobrança. O troco subiu para antes do campo "outro valor"
+- Snackbar cobria o botão de ação fixo no desktop
+
+**Limitação desta sessão:** o Bryan pediu verificação com Claude in Chrome, mas a extensão não estava conectada. A verificação foi feita com Chromium headless e screenshots. Vale repetir no Chrome real e em aparelho físico.
+
+**Pendências abertas:**
+- Publicar (a `0005` já está no Neon) — **API antes do front**. O front novo recusa dar por sincronizado o que um servidor antigo não confirma, então nada se perde, mas a tela fica mostrando erro de sincronização até a API subir
+- **Brecha pré-existente em `gravarInsumo`/`gravarFicha`** (`server/sync/rotas.ts`): o `onConflictDoUpdate` não filtra por tenant e o `set` inclui `tenantId`. Quem acertasse o UUID de um insumo de outra conta o sobrescreveria e o levaria para a própria. Exige adivinhar um UUID, mas é falha de isolamento. As tabelas novas já filtram; as antigas não foram tocadas
+- O nome "Precifica" (barra lateral, login, manifest do PWA) não descreve mais o produto
+- Cor da marca mudou de verde-água para um tom de frutas vermelhas — escolha minha, fácil de trocar em `--color-marca-*`
+

@@ -36,6 +36,20 @@
       "when": 1787429365520,
       "tag": "0004_luxuriant_mad_thinker",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790901921774,
+      "tag": "0005_wide_vin_gonzales",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790904805179,
+      "tag": "0006_nervous_sharon_carter",
+      "breakpoints": true
     }
   ]
 }

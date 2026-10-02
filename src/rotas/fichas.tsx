@@ -82,8 +82,8 @@ export function Fichas() {
   const config = paraConfigDominio(dados?.config)
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col bg-slate-50 pb-32">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white px-4 pt-4 pb-3">
+    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col pb-40">
+      <header className="vidro sticky top-3 z-10 mx-3 mt-3 rounded-3xl px-4 pt-4 pb-3">
         <h1 className="text-2xl font-bold text-slate-900">Fichas técnicas</h1>
         {/* so aparece quando ha o que buscar: campo de busca numa lista de 2
             itens e ruido que empurra o conteudo para baixo */}
@@ -116,7 +116,7 @@ export function Fichas() {
         )}
 
         {!comecarAtivo && dados && dados.fichas.length === 0 && (
-          <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 text-center">
+          <div className="vidro-cartao mt-10 rounded-3xl p-6 text-center">
             <h2 className="text-lg font-semibold">Nenhuma ficha ainda</h2>
             <p className="mt-2 text-sm text-slate-600">
               A ficha técnica é onde você monta o produto e descobre quanto ele custa.
@@ -150,8 +150,8 @@ export function Fichas() {
 
       {!comecarAtivo && dados && dados.fichas.length > 0 && (
         <div
-          className="fixed inset-x-0 bottom-12 mx-auto max-w-md px-4 pt-6 pb-2"
-          style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
+          className="fixed right-0 bottom-[var(--nav-h)] left-[var(--nav-w)] mx-auto max-w-3xl px-4 pt-6 pb-2"
+          style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
         >
           <button
             onClick={criar}
@@ -200,7 +200,7 @@ function LinhaFicha({
   // O botao de duplicar e IRMAO do de abrir, nao aninhado: <button> dentro de
   // <button> e HTML invalido e o navegador decide sozinho qual recebe o toque.
   return (
-    <li className="flex items-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <li className="vidro-cartao flex items-center overflow-hidden rounded-2xl">
       <button onClick={onAbrir} className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left">
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-slate-900">

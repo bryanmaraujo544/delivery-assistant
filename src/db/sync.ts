@@ -1,5 +1,14 @@
 import { api, lerSessao } from '../auth/sessao'
-import { CONFIG_PADRAO, db, unidadePorCodigo, type FichaLocal, type InsumoLocal } from './local'
+import type { ContagemEstoque } from '../dominio/estoque'
+import type { MovimentoCaixa, SessaoCaixa, Venda } from '../dominio/venda'
+import {
+  CONFIG_PADRAO,
+  db,
+  unidadePorCodigo,
+  type FichaLocal,
+  type InsumoLocal,
+  type ProdutoLocal,
+} from './local'
 
 /**
  * Sincronização.
@@ -16,6 +25,11 @@ import { CONFIG_PADRAO, db, unidadePorCodigo, type FichaLocal, type InsumoLocal 
  * ordem relevante entre mutações — nada disso existe aqui.
  *
  * REGRA DE OURO mantida: o servidor é a fonte da verdade; o IndexedDB é cache.
+ *
+ * CAIXA E VENDAS seguem outra regra. São fatos imutáveis, então não há "última
+ * escrita" a comparar: sobem enquanto estiverem marcados `pendente` e o
+ * servidor os insere de forma idempotente. A marca só é limpa quando o servidor
+ * confirma, por contagem, que recebeu aquele tipo de registro.
  */
 
 const CHAVE_ULTIMO = 'precifica.ultimoSync'
@@ -66,17 +80,30 @@ export async function limparDadosLocais() {
 
 /** Só o que mudou desde a última sincronização bem-sucedida. */
 async function coletarPendentes(desde: number) {
-  const [insumos, fichas, config] = await Promise.all([
+  const [insumos, fichas, config, produtos, sessoes, movimentos, vendas, contagens] = await Promise.all([
     db.insumos.filter((i) => i.atualizadoEm > desde).toArray(),
     db.fichas.filter((f) => f.atualizadoEm > desde).toArray(),
     db.config.get('default'),
+    db.produtos.filter((p) => p.atualizadoEm > desde).toArray(),
+    db.caixaSessoes.where('pendente').equals(1).toArray(),
+    db.caixaMovimentos.where('pendente').equals(1).toArray(),
+    db.vendas.where('pendente').equals(1).toArray(),
+    db.estoqueContagens.where('pendente').equals(1).toArray(),
   ])
-  return { insumos, fichas, config }
+  return { insumos, fichas, config, produtos, sessoes, movimentos, vendas, contagens }
 }
 
 export async function contarPendentes(): Promise<number> {
-  const { insumos, fichas } = await coletarPendentes(lerUltimoSync())
-  return insumos.length + fichas.length
+  const p = await coletarPendentes(lerUltimoSync())
+  return (
+    p.insumos.length +
+    p.fichas.length +
+    p.produtos.length +
+    p.sessoes.length +
+    p.movimentos.length +
+    p.vendas.length +
+    p.contagens.length
+  )
 }
 
 /**
@@ -92,9 +119,11 @@ export async function sincronizar(): Promise<{ estado: EstadoSync; enviados: num
   const desde = lerUltimoSync()
 
   try {
-    const { insumos, fichas, config } = await coletarPendentes(desde)
+    const { insumos, fichas, config, produtos, sessoes, movimentos, vendas, contagens } =
+      await coletarPendentes(desde)
+    const fatos = sessoes.length + movimentos.length + vendas.length + contagens.length
 
-    if (insumos.length > 0 || fichas.length > 0 || desde === 0) {
+    if (insumos.length > 0 || fichas.length > 0 || produtos.length > 0 || fatos > 0 || desde === 0) {
       const rPush = await api('/sync/push', {
         method: 'POST',
         body: JSON.stringify({
@@ -108,9 +137,31 @@ export async function sincronizar(): Promise<{ estado: EstadoSync; enviados: num
                 unidadesMes: config.unidadesMes,
               }
             : null,
+          produtos: produtos.map(paraEnvioProduto),
+          sessoes: sessoes.map(semPendencia),
+          movimentos: movimentos.map(semPendencia),
+          vendas: vendas.map(semPendencia),
+          contagens: contagens.map(semPendencia),
         }),
       })
       if (!rPush.ok) throw new Error(`push falhou: ${rPush.status}`)
+
+      // Um servidor de versão anterior ignora os campos que não conhece e
+      // responde ok. Sem conferir a contagem, o app daria as vendas por
+      // entregues e elas existiriam só neste aparelho.
+      const { recebidos } = (await rPush.json()) as { recebidos?: Record<string, number> }
+      if (
+        (recebidos?.produtos ?? 0) !== produtos.length ||
+        (recebidos?.sessoes ?? 0) !== sessoes.length ||
+        (recebidos?.movimentos ?? 0) !== movimentos.length ||
+        (recebidos?.vendas ?? 0) !== vendas.length ||
+        (recebidos?.contagens ?? 0) !== contagens.length
+      ) {
+        throw new Error('servidor não confirmou o recebimento de produtos/caixa/vendas')
+      }
+      await confirmarFatos(sessoes, movimentos, vendas)
+      // contagem nunca muda depois de criada: basta marcar pelo id
+      await db.estoqueContagens.where('id').anyOf(contagens.map((c) => c.id)).modify({ pendente: 0 })
     }
 
     const rPull = await api(`/sync/pull?desde=${desde}`)
@@ -125,7 +176,7 @@ export async function sincronizar(): Promise<{ estado: EstadoSync; enviados: num
 
     return {
       estado: 'ocioso',
-      enviados: insumos.length + fichas.length,
+      enviados: insumos.length + fichas.length + produtos.length + fatos,
       recebidos: dados.insumos.length + dados.fichas.length,
     }
   } catch (e) {
@@ -139,10 +190,65 @@ interface RespostaPull {
   insumos: Omit<InsumoLocal, 'dimensao'>[]
   fichas: FichaLocal[]
   config: Omit<(typeof CONFIG_PADRAO), 'id'> | null
+  produtos?: ProdutoLocal[]
+  sessoes?: SessaoCaixa[]
+  movimentos?: MovimentoCaixa[]
+  vendas?: Venda[]
+  contagens?: ContagemEstoque[]
+}
+
+/**
+ * Limpa `pendente` do que acabou de subir — mas só se o registro não mudou
+ * enquanto a requisição estava no ar. Uma venda cancelada nesse intervalo
+ * precisa continuar pendente para o cancelamento subir na próxima rodada.
+ */
+async function confirmarFatos(sessoes: SessaoCaixa[], movimentos: MovimentoCaixa[], vendas: Venda[]) {
+  await db.transaction('rw', db.caixaSessoes, db.caixaMovimentos, db.vendas, async () => {
+    for (const s of sessoes) {
+      await db.caixaSessoes
+        .where('id')
+        .equals(s.id)
+        .and((l) => (l.fechadaEm ?? null) === (s.fechadaEm ?? null))
+        .modify({ pendente: 0 })
+    }
+    await db.caixaMovimentos.where('id').anyOf(movimentos.map((m) => m.id)).modify({ pendente: 0 })
+    for (const v of vendas) {
+      await db.vendas
+        .where('id')
+        .equals(v.id)
+        .and((l) => (l.canceladaEm ?? null) === (v.canceladaEm ?? null))
+        .modify({ pendente: 0 })
+    }
+  })
 }
 
 async function aplicarPull(d: RespostaPull) {
-  await db.transaction('rw', db.insumos, db.fichas, db.config, async () => {
+  await db.transaction('rw', db.caixaSessoes, db.caixaMovimentos, db.vendas, async () => {
+    // Fato pendente local nunca é sobrescrito pelo que desce: ele carrega uma
+    // transição (fechar, cancelar) que o servidor ainda não viu.
+    for (const s of d.sessoes ?? []) {
+      if ((await db.caixaSessoes.get(s.id))?.pendente) continue
+      await db.caixaSessoes.put({ ...s, pendente: 0 })
+    }
+    for (const m of d.movimentos ?? []) {
+      if ((await db.caixaMovimentos.get(m.id))?.pendente) continue
+      await db.caixaMovimentos.put({ ...m, pendente: 0 })
+    }
+    for (const v of d.vendas ?? []) {
+      if ((await db.vendas.get(v.id))?.pendente) continue
+      await db.vendas.put({ ...v, pendente: 0 })
+    }
+  })
+
+  // contagem e imutavel: a que ja existe aqui e identica a que desce
+  await db.estoqueContagens.bulkPut((d.contagens ?? []).map((c) => ({ ...c, pendente: 0 as const })))
+
+  await db.transaction('rw', db.insumos, db.fichas, db.config, db.produtos, async () => {
+    for (const p of d.produtos ?? []) {
+      const local = await db.produtos.get(p.id)
+      if (local && local.atualizadoEm > p.atualizadoEm) continue
+      await db.produtos.put(p)
+    }
     for (const i of d.insumos) {
       const local = await db.insumos.get(i.id)
       // LWW também na descida: não sobrescrever edição local mais recente que
@@ -181,6 +287,20 @@ const paraEnvioInsumo = (i: InsumoLocal) => ({
   excluidoEm: i.excluidoEm ?? null,
 })
 
+const paraEnvioProduto = (p: ProdutoLocal) => ({
+  id: p.id,
+  nome: p.nome,
+  nomeNormalizado: p.nomeNormalizado,
+  categoria: p.categoria ?? null,
+  precoCentavos: p.precoCentavos,
+  fichaId: p.fichaId ?? null,
+  atualizadoEm: p.atualizadoEm,
+  excluidoEm: p.excluidoEm ?? null,
+})
+
+/** `pendente` é controle deste aparelho — não faz parte do fato. */
+const semPendencia = <T extends { pendente: 0 | 1 }>({ pendente: _, ...resto }: T) => resto
+
 const paraEnvioFicha = (f: FichaLocal) => ({
   id: f.id,
   nome: f.nome,
@@ -206,6 +326,16 @@ const paraEnvioFicha = (f: FichaLocal) => ({
  * demais. `online` + `visibilitychange` cobrem os casos reais — voltou a
  * conexão, ou a pessoa voltou ao app depois de trocar de aba.
  */
+const EVENTO_PEDIR_SYNC = 'precifica:sync'
+
+/**
+ * Pede uma sincronização agora, sem esperar o intervalo.
+ *
+ * Existe para a venda: ela é o único exemplar de um fato enquanto não sobe,
+ * então não faz sentido deixá-la até um minuto só no aparelho com a rede ali.
+ */
+export const pedirSync = () => window.dispatchEvent(new Event(EVENTO_PEDIR_SYNC))
+
 export function iniciarSyncAutomatico(aoMudar: (e: EstadoSync) => void) {
   let rodando = false
 
@@ -221,12 +351,14 @@ export function iniciarSyncAutomatico(aoMudar: (e: EstadoSync) => void) {
   const aoVoltarAoApp = () => document.visibilityState === 'visible' && rodar()
 
   window.addEventListener('online', rodar)
+  window.addEventListener(EVENTO_PEDIR_SYNC, rodar)
   document.addEventListener('visibilitychange', aoVoltarAoApp)
   const timer = setInterval(rodar, 60_000)
   void rodar()
 
   return () => {
     window.removeEventListener('online', rodar)
+    window.removeEventListener(EVENTO_PEDIR_SYNC, rodar)
     document.removeEventListener('visibilitychange', aoVoltarAoApp)
     clearInterval(timer)
   }

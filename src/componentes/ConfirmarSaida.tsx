@@ -46,7 +46,7 @@ export function ConfirmarSaida({ aberto, email, onCancelar, onConfirmar }: Props
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="titulo-sair"
-        className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl"
+        className="vidro-folha relative w-full max-w-sm rounded-3xl p-5 shadow-2xl"
       >
         <h2 id="titulo-sair" className="text-lg font-semibold text-slate-900">
           Sair da conta?

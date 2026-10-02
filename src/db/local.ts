@@ -1,5 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { Dimensao, ItemFicha, MarkupBase, TipoPerda } from '../dominio/custo'
+import type { ContagemEstoque } from '../dominio/estoque'
+import type { MovimentoCaixa, SessaoCaixa, Venda } from '../dominio/venda'
 
 /**
  * Store local (IndexedDB). O app e offline-first: a leitura primaria acontece
@@ -98,11 +100,54 @@ export interface ConfigLocal {
   unidadesMes: number
 }
 
+/**
+ * Produto de venda — o que aparece no balcao, com preco.
+ *
+ * NAO e a ficha tecnica: refrigerante e vela se vendem e nao tem receita. O
+ * vinculo com a ficha e opcional e existe para o produto herdar o custo, e a
+ * venda poder mostrar margem.
+ */
+export interface ProdutoLocal {
+  id: string
+  nome: string
+  nomeNormalizado: string
+  categoria?: string
+  precoCentavos: number
+  fichaId?: string | null
+  atualizadoEm: number
+  excluidoEm?: number | null
+}
+
+/**
+ * `pendente` (1 = ainda nao confirmado pelo servidor) em vez de comparar
+ * `atualizadoEm` com o ultimo sync, como fazem insumos e fichas.
+ *
+ * Aquela comparacao mistura relogio do aparelho com relogio do servidor: um
+ * celular atrasado grava com carimbo anterior ao ultimo sync e o registro
+ * nunca sobe. Para uma ficha isso se corrige na proxima edicao; uma venda
+ * nunca mais e editada, entao ficaria so no aparelho para sempre.
+ *
+ * E numero, nao boolean, porque IndexedDB nao indexa boolean.
+ */
+interface Pendencia {
+  pendente: 0 | 1
+}
+
+export type VendaLocal = Venda & Pendencia
+export type SessaoCaixaLocal = SessaoCaixa & Pendencia
+export type MovimentoCaixaLocal = MovimentoCaixa & Pendencia
+export type ContagemEstoqueLocal = ContagemEstoque & Pendencia
+
 const db = new Dexie('precifica') as Dexie & {
   insumos: EntityTable<InsumoLocal, 'id'>
   usoInsumos: EntityTable<UsoInsumoLocal, 'id'>
   fichas: EntityTable<FichaLocal, 'id'>
   config: EntityTable<ConfigLocal, 'id'>
+  produtos: EntityTable<ProdutoLocal, 'id'>
+  caixaSessoes: EntityTable<SessaoCaixaLocal, 'id'>
+  caixaMovimentos: EntityTable<MovimentoCaixaLocal, 'id'>
+  vendas: EntityTable<VendaLocal, 'id'>
+  estoqueContagens: EntityTable<ContagemEstoqueLocal, 'id'>
 }
 
 db.version(1).stores({
@@ -207,6 +252,31 @@ db.version(5)
         if (typeof i.favorito !== 'boolean') i.favorito = false
       })
   })
+
+/** v6 — PDV: produtos de venda, sessoes e movimentos de caixa, vendas. */
+db.version(6).stores({
+  insumos: 'id, nomeNormalizado, categoria, favorito, excluidoEm',
+  usoInsumos: 'id, insumoId, contexto',
+  fichas: 'id, nome, categoria, ehBase, excluidoEm',
+  config: 'id',
+  produtos: 'id, nomeNormalizado, categoria, excluidoEm',
+  caixaSessoes: 'id, abertaEm, pendente',
+  caixaMovimentos: 'id, sessaoId, pendente',
+  vendas: 'id, sessaoId, criadaEm, pendente',
+})
+
+/** v7 — contagens de estoque (o saldo e derivado delas e das vendas). */
+db.version(7).stores({
+  insumos: 'id, nomeNormalizado, categoria, favorito, excluidoEm',
+  usoInsumos: 'id, insumoId, contexto',
+  fichas: 'id, nome, categoria, ehBase, excluidoEm',
+  config: 'id',
+  produtos: 'id, nomeNormalizado, categoria, excluidoEm',
+  caixaSessoes: 'id, abertaEm, pendente',
+  caixaMovimentos: 'id, sessaoId, pendente',
+  vendas: 'id, sessaoId, criadaEm, pendente',
+  estoqueContagens: 'id, produtoId, pendente',
+})
 
 export const CONFIG_PADRAO: ConfigLocal = {
   id: 'default',

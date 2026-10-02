@@ -201,7 +201,7 @@ export function Comecar({ onPronto }: Props) {
             key={p.id}
             disabled={ocupado}
             onClick={() => escolher(p)}
-            className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left
+            className="vidro-cartao w-full rounded-2xl p-4 text-left
                        active:border-marca-600 disabled:opacity-60"
           >
             <span className="block font-semibold text-slate-900">{p.rotulo}</span>
@@ -278,7 +278,7 @@ function ConfirmarPrecos({
 
       <ul className="mt-5 space-y-3">
         {insumos.map((i) => (
-          <li key={i.id} className="rounded-xl border border-slate-200 bg-white p-3">
+          <li key={i.id} className="vidro-cartao rounded-2xl p-3">
             <div className="flex items-baseline justify-between gap-2">
               <span className="font-medium text-slate-900">{i.nome}</span>
               <span className="shrink-0 text-sm text-slate-500">

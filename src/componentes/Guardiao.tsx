@@ -9,7 +9,7 @@ import {
   type EstadoSync,
 } from '../db/sync'
 import { ConfirmarSaida } from './ConfirmarSaida'
-import { NavInferior } from './NavInferior'
+import { Navegacao } from './Navegacao'
 import { SnackbarGlobal } from './Snackbar'
 
 /**
@@ -49,10 +49,13 @@ export function Guardiao() {
 
   return (
     <>
-      <IndicadorSync estado={estado} />
-      <Outlet context={{ sincronizado } satisfies ContextoApp} />
+      {/* o conteudo abre espaco para a barra lateral no desktop */}
+      <div className="lg:pl-[var(--nav-w)]">
+        <IndicadorSync estado={estado} />
+        <Outlet context={{ sincronizado } satisfies ContextoApp} />
+      </div>
       <SnackbarGlobal />
-      <NavInferior onSair={() => setConfirmandoSaida(true)} />
+      <Navegacao email={sessao.email} onSair={() => setConfirmandoSaida(true)} />
 
       <ConfirmarSaida
         aberto={confirmandoSaida}
@@ -90,7 +93,7 @@ function IndicadorSync({ estado }: { estado: EstadoSync }) {
       role="status"
       aria-live="polite"
       className={`sticky top-0 z-40 px-4 py-1.5 text-center text-xs ${
-        estado === 'sincronizando' ? 'bg-slate-100 text-slate-600' : 'bg-amber-50 text-amber-900'
+        estado === 'sincronizando' ? 'vidro-barra text-slate-600' : 'bg-amber-50 text-amber-900'
       }`}
     >
       {texto}

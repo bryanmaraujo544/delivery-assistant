@@ -59,9 +59,10 @@ export function SnackbarGlobal() {
       // de outra leitura — e um aviso, nao um alerta
       role="status"
       aria-live="polite"
-      className="fixed inset-x-0 z-60 mx-auto flex w-[calc(100%-2rem)] max-w-md items-center
-                 justify-between gap-3 rounded-xl bg-slate-900 px-4 py-3 text-white shadow-lg"
-      style={{ bottom: 'max(4.5rem, env(safe-area-inset-bottom))' }}
+      className="fixed right-0 left-[var(--nav-w)] z-60 mx-auto flex w-[calc(100%-var(--nav-w)-2rem)]
+                 max-w-md items-center justify-between gap-3 rounded-2xl bg-slate-900/90 px-4 py-3
+                 text-white shadow-lg backdrop-blur"
+      style={{ bottom: 'calc(var(--nav-h) + 5.5rem + env(safe-area-inset-bottom))' }}
     >
       <span className="text-sm">{aviso.mensagem}</span>
       {aviso.onDesfazer && (

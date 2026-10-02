@@ -145,8 +145,8 @@ export function FichaEditor() {
   if (!ficha) return <p className="p-10 text-center text-slate-500">Ficha não encontrada.</p>
 
   return (
-    <main className="mx-auto min-h-dvh max-w-md bg-slate-50 pb-24">
-      <header className="sticky top-0 z-10 flex items-center gap-2 border-b border-slate-200 bg-white px-2 py-3">
+    <main className="mx-auto min-h-dvh max-w-3xl pb-32">
+      <header className="vidro sticky top-3 z-10 mx-3 mt-3 flex items-center gap-2 rounded-3xl px-2 py-3">
         <button onClick={() => navigate('/fichas')} className="px-2 text-slate-600" aria-label="Voltar">
           ←
         </button>
@@ -377,7 +377,7 @@ export function FichaEditor() {
 
 function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4">
+    <section className="vidro-cartao rounded-2xl p-4">
       <h2 className="mb-3 text-xs font-semibold tracking-wide text-slate-500 uppercase">{titulo}</h2>
       {children}
     </section>
@@ -747,7 +747,7 @@ function PainelCusto({
   const precoCanal = aplicarTaxaDeCanal(preco.precoUnitario, canal.taxa)
 
   return (
-    <section className="rounded-xl border border-marca-500/40 bg-white p-4">
+    <section className="vidro-cartao rounded-2xl p-4">
       <div className="flex items-baseline justify-between">
         <span className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
           Preço por {ficha.unidadeRendimento}
