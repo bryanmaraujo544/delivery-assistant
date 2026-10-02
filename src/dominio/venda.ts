@@ -202,6 +202,8 @@ export function resumoCaixa(
 
 export interface ResumoVendas {
   quantidadeVendas: number
+  /** unidades vendidas, somando todos os produtos: 2 bolos + 1 doce = 3 */
+  quantidadeItens: number
   quantidadeCanceladas: number
   totalCentavos: Centavos
   ticketMedioCentavos: Centavos
@@ -256,6 +258,7 @@ export function resumoVendas(vendas: Venda[]): ResumoVendas {
 
   return {
     quantidadeVendas: ok.length,
+    quantidadeItens: unidadesComCusto + unidadesSemCusto,
     quantidadeCanceladas: vendas.length - ok.length,
     totalCentavos,
     ticketMedioCentavos: ok.length > 0 ? Math.round(totalCentavos / ok.length) : 0,

@@ -60,7 +60,11 @@ export function Vendas() {
         <div className="space-y-4 px-4 pt-4">
           <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Cartao rotulo="Vendido" valor={formatarBRL(r.totalCentavos)} destaque />
-            <Cartao rotulo="Vendas" valor={String(r.quantidadeVendas)} />
+            <Cartao
+              rotulo="Vendas"
+              valor={String(r.quantidadeVendas)}
+              nota={`${r.quantidadeItens} ${r.quantidadeItens === 1 ? 'item vendido' : 'itens vendidos'}`}
+            />
             <Cartao rotulo="Ticket médio" valor={formatarBRL(r.ticketMedioCentavos)} />
             <Cartao
               rotulo="Lucro bruto"
