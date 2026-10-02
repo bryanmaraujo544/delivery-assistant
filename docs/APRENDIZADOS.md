@@ -86,6 +86,16 @@ SaaS multi-tenant com assinatura. **Requisito explícito do Bryan:** suportar **
 
 **Decisão:** `billing_status: trial | active | past_due | exempt` como campo de primeira classe. **Não** implementar como cupom de 100% de desconto — conta isenta é *estado*, não desconto, e misturar os dois vira dívida técnica na primeira reconciliação financeira.
 
+### [2026-10-01] O produto virou PDV; precificação é um módulo
+
+**Decisão do Bryan.** O sistema passa a cobrir a operação da loja física e do delivery. O centro é o controle de vendas: produtos, caixa, venda. Isso **revoga** "SaaS de precificação" como definição do produto e a decisão de deixar vendas/encomendas fora.
+
+O que **não** muda: tudo que está em § B sobre custo, e a promessa do recálculo em cascata — agora ela alimenta a margem de cada venda.
+
+**Público também mudou.** Antes: a confeiteira na cozinha, celular na bancada. Agora, além dela: **quem atende no balcão, no desktop, sem costume com tecnologia**. Desktop passa a ser o alvo principal; celular continua tendo de funcionar.
+
+**Sem fiscal.** NFC-e está fora por decisão explícita. O sistema é controle gerencial. (A obrigação fiscal em si segue não apurada — § G.)
+
 ---
 
 ## B. Domínio: precificação de confeitaria
@@ -288,6 +298,34 @@ O maior ponto de abandono é o cold start.
 - O seed precisa ser removível em massa
 - Estado vazio residual: **ghost row** (linha fantasma em baixa opacidade) em vez de ilustração centralizada
 
+### [2026-10-01] Venda em 3 telas, sem teclado no caminho principal
+
+```
+tocar nos produtos → Cobrar → tocar na forma de pagamento → pronto
+```
+
+- Pix/débito/crédito: 2 toques depois de "Cobrar". Dinheiro com nota redonda: 3
+- O "recebido" em dinheiro já vem no **valor exato**, e as próximas cédulas (`sugestoesDeRecebido`) ficam a um toque
+- Desconto e pagamento dividido existem, mas atrás de um link — quem não usa nunca os vê como obrigação
+- **A confirmação ocupa a tela inteira.** Com troco, espera o toque (a pessoa está contando notas); sem troco, some em 4 s
+- "Desfazer esta venda" na própria confirmação: o erro mais comum (tocou no produto errado) se resolve sem ir ao histórico
+
+### [2026-10-01] Fechamento de caixa é contagem CEGA
+
+Primeiro a pessoa conta a gaveta; só depois o sistema mostra o esperado. Mostrar antes transforma a contagem em "digitar o número que o sistema quer", e a diferença — única informação útil do fechamento — some.
+
+Depois de conferir, a conta aparece **linha a linha** (troco inicial + vendas em dinheiro + entradas − retiradas), que é o "mostre a conta" aplicado ao caixa: é o que deixa a pessoa achar onde errou.
+
+"Sangria" e "suprimento" são jargão. Os botões dizem **"Retirar dinheiro"** e **"Colocar dinheiro"**, com o termo técnico só como legenda.
+
+### [2026-10-01] Liquid glass: vidro na moldura, sólido no conteúdo
+
+- **Vidro** (`vidro`, `vidro-barra`): navegação, cabeçalhos, painel do pedido
+- **Quase opaco** (`vidro-solido`): tudo que tem dinheiro — botão de produto, total, troco, listas. Número sobre fundo translúcido muda de contraste conforme o que passa atrás
+- O vidro só "lê" como vidro com cor atrás: o fundo é um gradiente fixo num `body::before` (não `background-attachment: fixed`, que engasga a rolagem em Android barato)
+- Fallback opaco para `prefers-reduced-transparency` e para navegador sem `backdrop-filter`
+- **Não medido:** custo do blur em Android de entrada. Público é 78% Android — testar em aparelho real antes de publicar
+
 ---
 
 ## D. Decisões técnicas
@@ -396,6 +434,40 @@ Uma fila de verdade só se justificaria com operações **não-idempotentes** ou
 - **LWW nos dois sentidos.** Na subida via `setWhere: lt(tabela.atualizadoEm, novoValor)`; na descida comparando antes de gravar no Dexie.
 - **`tenantId` vem SEMPRE da sessão**, nunca do corpo. Confiar no cliente para dizer de quem são os dados é vazamento garantido.
 - **Sem Background Sync API** — só existe em Chromium e falha calada nos demais. `online` + `visibilitychange` + intervalo cobrem os casos reais.
+
+### [2026-10-01] Caixa e vendas são FATOS, não registros com LWW
+
+A regra de 15/08 dizia que fila/eventos só se justificariam com operação não-idempotente ou mais de uma pessoa escrevendo. **O PDV traz as duas coisas** (balcão + celular; e venda sobrescrita é dinheiro sumindo). Para essas tabelas o modelo é outro:
+
+- **Insert idempotente.** O id nasce no cliente; o servidor faz `ON CONFLICT DO NOTHING`. Reenviar o lote não duplica venda
+- **Sem edição.** As únicas transições são fechar a sessão e cancelar a venda, cada uma no máximo uma vez (`WHERE ... IS NULL`)
+- **Saldo nunca é coluna.** O esperado da gaveta é soma dos fatos (`resumoCaixa`). Contador editável perderia atualização na primeira escrita simultânea
+- **A venda é uma fotografia.** Guarda nome, preço **e custo** da hora. Renomear o produto ou subir o preço do leite condensado não reescreve o passado
+- **O servidor recalcula o total** com a mesma `validarVenda` do cliente; nunca grava um total porque ele veio no corpo
+
+Insumos, fichas e **produtos** continuam em LWW — são catálogo, e ali "a última edição vence" é o comportamento certo.
+
+### [2026-10-01] `pendente` em vez de comparar `atualizadoEm` com o último sync
+
+O sync de insumos/fichas envia o que tem `atualizadoEm > ultimoSync`. Só que `atualizadoEm` é relógio do **aparelho** e `ultimoSync` é carimbo do **servidor**. Um celular com o relógio atrasado grava com data anterior ao último sync, e o registro nunca sobe.
+
+Para uma ficha isso se conserta na próxima edição. **Uma venda nunca mais é editada** — ficaria só no aparelho para sempre. Por isso caixa e vendas sobem por uma marca `pendente` (0/1, porque IndexedDB não indexa boolean), limpa só depois que o servidor **confirma a contagem recebida**.
+
+A confirmação por contagem existe por outro motivo também: um servidor de versão anterior descarta campos que não conhece e responde `ok`. Sem conferir, o app daria as vendas por entregues.
+
+No servidor, o pull de fatos filtra por `sincronizado_em` (carimbo do servidor) com 5 min de folga para trás, para não perder o que estava em transação no momento do pull. Reentregar é inofensivo: o cliente aplica por id.
+
+**A mesma fragilidade continua existindo em insumos/fichas/produtos.** Não foi mexida; fica registrada.
+
+### [2026-10-01] FK garante que existe, não de quem é
+
+`venda.sessao_id` tem FK para `caixa_sessao`, o que só prova que a sessão existe. Sem checar o tenant, daria para pendurar uma venda no caixa de outra conta. O push confere que toda sessão referenciada é do tenant da sessão autenticada (ou veio no mesmo lote).
+
+Mesma família de problema: `onConflictDoUpdate` por `id` sem filtrar tenant deixa quem acerta o id sobrescrever o registro alheio. As tabelas do PDV filtram; `gravarInsumo` e `gravarFicha` **não** — pendência em PROGRESSO.
+
+### [2026-10-01] Verificar o servidor sem tocar no Neon
+
+O `.env` local aponta para o Neon, que é produção. Para testar a API e as migrations: Postgres descartável em Docker noutra porta, migrations aplicadas com `psql -f` (o `--> statement-breakpoint` do drizzle é comentário SQL válido), e a API iniciada com `DATABASE_URL` na linha de comando — o `dotenv` não sobrescreve variável já definida.
 
 ### [2026-08-15] Id sintético no seed quebrou só na primeira sincronização
 
@@ -642,6 +714,18 @@ O parser da NYT (`ingredient-phrase-tagger`) está **arquivado desde 2019**, é 
 - **Não fechar o teclado entre campos do mesmo tipo** — agrupar numéricos em sequência
 - Ações destrutivas **fora** da thumb zone fácil, de propósito
 
+### [2026-10-01] Campo de dinheiro pré-preenchido precisa substituir, não anexar
+
+`CampoDinheiro` é estilo caixa eletrônico: cada dígito entra pela direita. Isso é ótimo num campo vazio e **desastroso num campo que já abre com uma sugestão**: sobre R$ 15,00, digitar `5000` vira R$ 150.050,00.
+
+Campo que nasce preenchido (valor recebido, parte do pagamento, preço ao editar) usa `selecionarAoFocar`: seleciona tudo no foco, e a primeira tecla substitui. Precisa também segurar o `mouseup` do clique que deu o foco, senão ele reposiciona o cursor e desfaz a seleção.
+
+Pego porque o teste automatizado não conseguia dividir um pagamento — o robô esbarrou no mesmo problema que uma pessoa teria.
+
+### [2026-10-01] Custo desconhecido não é custo zero
+
+Produto sem ficha (revenda) não tem custo conhecido. A venda grava `custoUnitarioCentavos: null`, e o lucro bruto soma **só** os itens com custo, dizendo quantos ficaram de fora. Tratar `null` como 0 mostraria "lucro de 100%" no refrigerante.
+
 ### [2026-08-15] `markupParaMargem()` NÃO é a margem real quando a base é "materiais"
 
 Bug pego rodando a tela de ficha. O painel exibia, ao mesmo tempo:
@@ -694,6 +778,8 @@ Registro de coisas que acreditávamos e se mostraram erradas. **Consultar antes 
 | Drizzle é a escolha moderna óbvia | Drizzle 1.0 em RC há 17 meses; Prisma 7 ficou leve | registry npm |
 | Concorrentes lideram com WhatsApp | WhatsApp é sempre **saída** (PDF/link colado), nunca manchete | análise competitiva |
 | ~6 concorrentes no BR | **~17 confirmados**, R$ 15–45/mês | análise competitiva |
+| Uma usuária por conta ⇒ LWW basta para tudo | Vale para catálogo; **caixa e vendas** têm mais de um aparelho e não podem ser sobrescritas ⇒ fatos idempotentes | virada para PDV, 01/10/2026 |
+| O produto é precificação | É o **PDV da loja**; precificação é módulo | decisão do Bryan, 01/10/2026 |
 
 ---
 
@@ -701,6 +787,7 @@ Registro de coisas que acreditávamos e se mostraram erradas. **Consultar antes 
 
 Não deixe o código depender disso sem verificar na fonte primária:
 
+- **Obrigação fiscal de loja física** (NFC-e para MEI, regras por estado) — não apurado. O sistema não emite nota, por decisão do Bryan; confirmar com contador antes de vender para terceiros
 - **MEI e rotulagem** (limite de faturamento, DAS, CNAE, RDC 429/2020, RDC 26/2015 alergênicos, Lei 10.674/2003 glúten) — **seção inteira não apurada**. São dados onde errar custa caro
 - **PWA no iOS 26**: estado do Web Push, quota de IndexedDB, política de evicção, `navigator.storage.persist()`
 - **OAuth / magic link em PWA standalone no iOS** — historicamente quebravam (abrem no Safari, sessão não volta). Não confirmado para 2026
