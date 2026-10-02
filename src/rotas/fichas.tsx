@@ -83,7 +83,7 @@ export function Fichas() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-3xl flex-col pb-40">
-      <header className="vidro-barra sticky top-0 z-10 px-4 pt-4 pb-3">
+      <header className="vidro sticky top-3 z-10 mx-3 mt-3 rounded-3xl px-4 pt-4 pb-3">
         <h1 className="text-2xl font-bold text-slate-900">Fichas técnicas</h1>
         {/* so aparece quando ha o que buscar: campo de busca numa lista de 2
             itens e ruido que empurra o conteudo para baixo */}

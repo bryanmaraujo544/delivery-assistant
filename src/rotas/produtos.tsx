@@ -138,7 +138,7 @@ export function Produtos() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-3xl flex-col">
-      <header className="vidro-barra sticky top-0 z-10 px-4 pt-4 pb-3">
+      <header className="vidro sticky top-3 z-10 mx-3 mt-3 rounded-3xl px-4 pt-4 pb-3">
         <h1 className="text-2xl font-bold text-slate-900">Produtos</h1>
         {(dados?.produtos.length ?? 0) > 4 && (
           <input

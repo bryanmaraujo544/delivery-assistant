@@ -171,7 +171,7 @@ export function Vender() {
   return (
     <main className="min-h-dvh lg:flex lg:h-dvh lg:gap-4 lg:p-3">
       <section className="flex min-w-0 flex-1 flex-col pb-52 lg:overflow-y-auto lg:pb-4">
-        <header className="vidro-barra sticky top-0 z-10 px-4 pt-4 pb-3 lg:rounded-3xl">
+        <header className="vidro sticky top-3 z-10 mx-3 mt-3 rounded-3xl px-4 pt-4 pb-3 lg:mx-0 lg:mt-0 lg:top-0">
           <h1 className="text-2xl font-bold text-slate-900">Vender</h1>
           {!ehHoje(dados.sessao.abertaEm) && (
             <p className="mt-1 text-sm text-amber-800">

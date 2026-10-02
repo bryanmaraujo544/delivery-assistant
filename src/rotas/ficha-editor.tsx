@@ -146,7 +146,7 @@ export function FichaEditor() {
 
   return (
     <main className="mx-auto min-h-dvh max-w-3xl pb-32">
-      <header className="vidro-barra sticky top-0 z-10 flex items-center gap-2 px-2 py-3">
+      <header className="vidro sticky top-3 z-10 mx-3 mt-3 flex items-center gap-2 rounded-3xl px-2 py-3">
         <button onClick={() => navigate('/fichas')} className="px-2 text-slate-600" aria-label="Voltar">
           ←
         </button>

@@ -40,7 +40,7 @@ export function Caixa() {
 
   return (
     <main className="mx-auto min-h-dvh max-w-3xl pb-40">
-      <header className="vidro-barra sticky top-0 z-10 px-4 pt-4 pb-3">
+      <header className="vidro sticky top-3 z-10 mx-3 mt-3 rounded-3xl px-4 pt-4 pb-3">
         <h1 className="text-2xl font-bold text-slate-900">Caixa</h1>
         <p className="text-sm text-slate-600">
           {aberta
