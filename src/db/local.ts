@@ -114,6 +114,8 @@ export interface ProdutoLocal {
   categoria?: string
   precoCentavos: number
   fichaId?: string | null
+  /** posicao na tela de venda; ausente = ainda nao arrumado (vai para o fim) */
+  ordem?: number | null
   atualizadoEm: number
   excluidoEm?: number | null
 }

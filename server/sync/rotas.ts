@@ -293,6 +293,7 @@ export async function registrarRotasSync(app: FastifyInstance) {
         categoria: p.categoria,
         precoCentavos: p.precoCentavos,
         fichaId: p.fichaId,
+        ordem: p.ordem,
         atualizadoEm: p.atualizadoEm.getTime(),
         excluidoEm: p.excluidoEm?.getTime() ?? null,
       })),
@@ -434,6 +435,7 @@ async function gravarProduto(tx: Tx, tenantId: string, p: ProdutoSync) {
     categoria: p.categoria ?? null,
     precoCentavos: p.precoCentavos,
     fichaId: p.fichaId ?? null,
+    ordem: p.ordem ?? null,
     atualizadoEm: new Date(p.atualizadoEm),
     excluidoEm: p.excluidoEm ? new Date(p.excluidoEm) : null,
   }
