@@ -145,8 +145,8 @@ export function FichaEditor() {
   if (!ficha) return <p className="p-10 text-center text-slate-500">Ficha não encontrada.</p>
 
   return (
-    <main className="mx-auto min-h-dvh max-w-md bg-slate-50 pb-24">
-      <header className="sticky top-0 z-10 flex items-center gap-2 border-b border-slate-200 bg-white px-2 py-3">
+    <main className="mx-auto min-h-dvh max-w-3xl pb-32">
+      <header className="vidro-barra sticky top-0 z-10 flex items-center gap-2 px-2 py-3">
         <button onClick={() => navigate('/fichas')} className="px-2 text-slate-600" aria-label="Voltar">
           ←
         </button>

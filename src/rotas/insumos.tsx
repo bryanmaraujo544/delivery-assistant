@@ -164,8 +164,8 @@ export function Insumos() {
   const vazio = !carregando && (insumos?.length ?? 0) === 0
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col bg-slate-50">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white px-4 pt-4 pb-3">
+    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col">
+      <header className="vidro-barra sticky top-0 z-10 px-4 pt-4 pb-3">
         <h1 className="text-2xl font-bold text-slate-900">Insumos</h1>
         <input
           value={busca}
@@ -177,7 +177,7 @@ export function Insumos() {
         />
       </header>
 
-      <div className="flex-1 px-4 pb-32">
+      <div className="flex-1 px-4 pb-48">
         {carregando && <p className="py-10 text-center text-slate-400">Carregando…</p>}
 
         {vazio && <EstadoVazio onCarregarSeed={aplicarSeed} onCriar={() => abrirNovo()} />}
@@ -225,8 +225,7 @@ export function Insumos() {
       </div>
 
       <div
-        className="fixed inset-x-0 bottom-12 mx-auto max-w-md bg-gradient-to-t from-slate-50
-                   via-slate-50 to-transparent px-4 pt-6 pb-4"
+        className="fixed right-0 bottom-[var(--nav-h)] left-[var(--nav-w)] mx-auto max-w-3xl px-4 pt-6 pb-4"
         style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
       >
         <button

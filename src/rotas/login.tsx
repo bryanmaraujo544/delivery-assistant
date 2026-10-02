@@ -47,7 +47,7 @@ export function Login() {
       // sem esperar sincronizacao. Sem esta marca, quem se cadastra offline (ou
       // com a API fora do ar) cai na tela vazia crua em vez do onboarding.
       if (criando) localStorage.setItem('precifica.contaNova', '1')
-      navigate('/fichas', { replace: true })
+      navigate('/', { replace: true })
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Falha na conexão.')
       setSenha('')
