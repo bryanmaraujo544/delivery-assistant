@@ -83,6 +83,7 @@ export const zProduto = z.object({
   categoria: z.string().max(100).nullish(),
   precoCentavos: z.number().int().min(0),
   fichaId: z.uuid().nullish(),
+  ordem: z.number().int().min(0).nullish(),
   atualizadoEm: z.number().int(),
   excluidoEm: z.number().int().nullish(),
 })

@@ -404,6 +404,8 @@ export const produto = pgTable(
     precoCentavos: integer('preco_centavos').notNull(),
     /** sem FK: a ficha pode chegar em outro lote, e ela so e apagada por soft delete */
     fichaId: uuid('ficha_id'),
+    /** posicao escolhida a mao na tela de venda; nulo = ainda nao arrumado */
+    ordem: integer('ordem'),
     criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
     atualizadoEm: timestamp('atualizado_em', { withTimezone: true }).notNull().defaultNow(),
     excluidoEm: timestamp('excluido_em', { withTimezone: true }),

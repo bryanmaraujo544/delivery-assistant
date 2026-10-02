@@ -294,6 +294,7 @@ const paraEnvioProduto = (p: ProdutoLocal) => ({
   categoria: p.categoria ?? null,
   precoCentavos: p.precoCentavos,
   fichaId: p.fichaId ?? null,
+  ordem: p.ordem ?? null,
   atualizadoEm: p.atualizadoEm,
   excluidoEm: p.excluidoEm ?? null,
 })

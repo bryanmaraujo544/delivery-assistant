@@ -1,0 +1,1 @@
+ALTER TABLE "produto" ADD COLUMN "ordem" integer;

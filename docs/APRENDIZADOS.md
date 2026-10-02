@@ -332,6 +332,15 @@ Venda que desaparece sem rastro é exatamente o que impede de conferir o caixa d
 - **Primeiro fundo ficou branco demais** ("cara simplista"): sobre fundo quase branco, vidro é só cartão branco. A primeira correção exagerou para um rosa saturado, com cara de chiclete. O ponto certo foi um degradê claro com manchas de croma contido (≤ 0,11) e um grão leve contra banding
 - **Cabeçalho em faixa reta** ficava feio: um retângulo de borda dura, mais estreito que a janela, boiando no papel de parede. Virou placa de vidro flutuante e arredondada, como a barra lateral
 
+### [2026-10-01] Arrumar a tela de venda: modo separado, arrasto só pela alça
+
+- **Modo próprio ("Arrumar"), não arrasto direto na tela de venda.** No balcão, um toque longo ou um arrasto acidental não pode nem mover cartão nem pôr bolo no pedido. No modo de arrumar o cartão não vende
+- **Arrasto só pela alça**, com `touch-action: none` nela: o resto do cartão continua rolando a página no celular
+- Ponteiro (`pointer events`) em vez de biblioteca de drag and drop: mouse e dedo no mesmo código, zero dependência
+- A grade se rearruma **durante** o arrasto; a pessoa vê onde vai cair
+- A ordem é campo do produto (`ordem`) e sincroniza. Só no aparelho, balcão e celular teriam telas diferentes
+- **Armadilha evitada:** o editor de produto reescrevia o registro do zero ao salvar, o que apagaria a `ordem` a cada edição. Agora preserva o que não edita
+
 ### [2026-10-01] Estoque: saldo derivado, nunca gravado
 
 Controle opcional por produto (pronta entrega sim, encomenda não). O que se grava é a **contagem** ("agora tem 12"); o saldo é a última contagem menos as vendas posteriores (`src/dominio/estoque.ts`).

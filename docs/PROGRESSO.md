@@ -41,6 +41,8 @@ Decisões e aprendizados vão em [APRENDIZADOS.md](APRENDIZADOS.md) — aqui fic
 - [x] Excluir venda (some da lista, fica em "Ver N excluídas"), inclusive após o caixa fechado
 - [x] Estoque opcional por produto, com baixa na venda e devolução ao excluir
 - [x] Migration `0006` (`estoque_contagem`) aplicada no Neon em 01/10/2026 (autorizada pelo Bryan) — conferido no banco: 20 tabelas, 7 migrations registradas
+- [x] Arrumar a tela de venda arrastando os cartões; editar produto direto do balcão; faixa "Sem estoque"
+- [x] Migration `0007` (`produto.ordem`) aplicada no Neon em 01/10/2026 (autorizada pelo Bryan) — conferido: coluna `integer` anulável, 8 migrations registradas. PR #2 mergeado em seguida
 - [ ] **Merge em `main` e deploy** ← só com ordem do Bryan. **A API sobe antes do front** (ver log)
 - [ ] Teste em aparelho real (celular Android barato: o blur do vidro pesa)
 
