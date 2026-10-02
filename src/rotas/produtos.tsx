@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import { BottomSheet } from '../componentes/BottomSheet'
 import { CampoDinheiro } from '../componentes/CampoDinheiro'
 import { mostrarAviso } from '../componentes/Snackbar'
-import { custoDoProduto } from '../db/caixa'
+import { custoDoProduto, registrarContagem } from '../db/caixa'
 import { montarCatalogo, paraConfigDominio } from '../db/catalogo'
 import { db, normalizar, type FichaLocal, type ProdutoLocal } from '../db/local'
 import { pedirSync } from '../db/sync'
@@ -15,6 +15,7 @@ import {
   type ConfigProducao,
 } from '../dominio/custo'
 import { formatarBRL } from '../dominio/dinheiro'
+import { estoqueAtual } from '../dominio/estoque'
 
 const SEM_CATEGORIA = 'Outros'
 
@@ -38,22 +39,33 @@ interface Rascunho {
   precoCentavos: number
   categoria: string
   fichaId: string | null
+  /** null = estoque nao controlado (encomenda, item feito na hora) */
+  estoque: number | null
 }
 
-const RASCUNHO_VAZIO: Rascunho = { id: null, nome: '', precoCentavos: 0, categoria: '', fichaId: null }
+const RASCUNHO_VAZIO: Rascunho = {
+  id: null,
+  nome: '',
+  precoCentavos: 0,
+  categoria: '',
+  fichaId: null,
+  estoque: null,
+}
 
 export function Produtos() {
   const [busca, setBusca] = useState('')
   const [rascunho, setRascunho] = useState<Rascunho | null>(null)
 
   const dados = useLiveQuery(async () => {
-    const [produtos, fichas, insumos, config] = await Promise.all([
+    const [produtos, fichas, insumos, config, contagens, vendas] = await Promise.all([
       db.produtos.filter((p) => !p.excluidoEm).toArray(),
       db.fichas.filter((f) => !f.excluidoEm).toArray(),
       db.insumos.filter((i) => !i.excluidoEm).toArray(),
       db.config.get('default'),
+      db.estoqueContagens.toArray(),
+      db.vendas.toArray(),
     ])
-    return { produtos, fichas, insumos, config }
+    return { produtos, fichas, insumos, config, estoque: estoqueAtual(contagens, vendas) }
   }, [])
 
   const catalogo = useMemo(
@@ -86,8 +98,9 @@ export function Produtos() {
   async function salvar(r: Rascunho) {
     const nome = r.nome.trim()
     if (!nome) return
+    const id = r.id ?? crypto.randomUUID()
     await db.produtos.put({
-      id: r.id ?? crypto.randomUUID(),
+      id,
       nome,
       nomeNormalizado: normalizar(nome),
       categoria: r.categoria.trim() || undefined,
@@ -96,6 +109,11 @@ export function Produtos() {
       atualizadoEm: Date.now(),
       excluidoEm: null,
     })
+    // So grava contagem quando o numero mudou de verdade: salvar o produto
+    // para trocar o preco nao pode "recontar" o estoque e apagar as vendas
+    // feitas desde a ultima contagem.
+    const atual = dados?.estoque.get(id) ?? null
+    if (r.estoque !== atual) await registrarContagem(id, r.estoque)
     pedirSync()
     setRascunho(null)
   }
@@ -196,11 +214,15 @@ export function Produtos() {
                           precoCentavos: p.precoCentavos,
                           categoria: p.categoria ?? '',
                           fichaId: p.fichaId ?? null,
+                          estoque: dados!.estoque.get(p.id) ?? null,
                         })
                       }
                       className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-white/50"
                     >
-                      <span className="min-w-0 flex-1 truncate font-medium">{p.nome}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">{p.nome}</span>
+                        <SeloEstoque quantidade={dados!.estoque.get(p.id)} />
+                      </span>
                       <span className="shrink-0 text-right">
                         <span className="block font-semibold tabular-nums">
                           {formatarBRL(p.precoCentavos)}
@@ -251,6 +273,18 @@ export function Produtos() {
         />
       )}
     </main>
+  )
+}
+
+/** Nada quando o estoque nao e controlado: ausencia de numero nao e zero. */
+export function SeloEstoque({ quantidade }: { quantidade: number | undefined }) {
+  if (quantidade === undefined) return null
+  const cor = quantidade <= 0 ? 'text-red-700' : quantidade <= 3 ? 'text-amber-700' : 'text-slate-500'
+  return (
+    <span className={`block text-xs font-medium ${cor}`}>
+      {quantidade <= 0 ? 'Sem estoque' : `${quantidade} em estoque`}
+      {quantidade < 0 && ` (${quantidade})`}
+    </span>
   )
 }
 
@@ -422,6 +456,69 @@ function FormProduto({
           <p className="mt-1.5 text-xs text-slate-500">
             Com a ficha, o sistema sabe o custo e mostra o lucro de cada venda.
           </p>
+        </div>
+
+        <div>
+          <label className="flex items-center gap-3 font-medium text-slate-700">
+            <input
+              type="checkbox"
+              checked={r.estoque !== null}
+              onChange={(e) => setR({ ...r, estoque: e.target.checked ? Math.max(0, inicial.estoque ?? 0) : null })}
+              className="h-6 w-6 accent-marca-600"
+            />
+            Controlar estoque
+          </label>
+          {r.estoque === null ? (
+            <p className="mt-1.5 text-xs text-slate-500">
+              Ligue para produtos de pronta entrega. Cada venda baixa o estoque sozinha.
+            </p>
+          ) : (
+            <div className="mt-3">
+              <label htmlFor="p-estoque" className="mb-1.5 block text-sm text-slate-700">
+                Quantos tem agora?
+              </label>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setR({ ...r, estoque: Math.max(0, r.estoque! - 1) })}
+                  aria-label="Um a menos"
+                  className="h-14 w-14 shrink-0 rounded-xl bg-slate-100 text-2xl font-bold text-slate-700"
+                >
+                  −
+                </button>
+                <input
+                  id="p-estoque"
+                  inputMode="numeric"
+                  value={r.estoque}
+                  onFocus={(e) => e.currentTarget.select()}
+                  onChange={(e) =>
+                    setR({ ...r, estoque: Math.min(Number(e.target.value.replace(/\D/g, '') || 0), 99_999) })
+                  }
+                  className="h-14 min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-4 text-center
+                             text-xl font-semibold tabular-nums focus:border-marca-600 focus:ring-2
+                             focus:ring-marca-500/30 focus:outline-none"
+                />
+                <button
+                  onClick={() => setR({ ...r, estoque: r.estoque! + 1 })}
+                  aria-label="Um a mais"
+                  className="h-14 w-14 shrink-0 rounded-xl bg-slate-100 text-2xl font-bold text-slate-700"
+                >
+                  +
+                </button>
+              </div>
+              {/* repor a fornada sem teclado */}
+              <div className="mt-2 flex gap-2">
+                {[5, 10, 20].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setR({ ...r, estoque: r.estoque! + n })}
+                    className="flex-1 rounded-full border border-slate-300 bg-white font-semibold text-slate-700"
+                  >
+                    + {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </BottomSheet>

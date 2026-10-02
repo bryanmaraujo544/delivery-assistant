@@ -9,6 +9,7 @@ import { montarCatalogo, paraConfigDominio } from '../db/catalogo'
 import { db, normalizar, type ProdutoLocal } from '../db/local'
 import { ehHoje, formatarDia } from '../dominio/datas'
 import { formatarBRL } from '../dominio/dinheiro'
+import { estoqueAtual } from '../dominio/estoque'
 import {
   FORMAS,
   ROTULO_FORMA,
@@ -65,18 +66,21 @@ export function Vender() {
   const [concluida, setConcluida] = useState<{ venda: Venda; carrinho: Carrinho } | null>(null)
 
   const dados = useLiveQuery(async () => {
-    const [produtos, fichas, insumos, config, sessoes] = await Promise.all([
+    const [produtos, fichas, insumos, config, sessoes, contagens, vendas] = await Promise.all([
       db.produtos.filter((p) => !p.excluidoEm).toArray(),
       db.fichas.filter((f) => !f.excluidoEm).toArray(),
       db.insumos.filter((i) => !i.excluidoEm).toArray(),
       db.config.get('default'),
       db.caixaSessoes.filter((s) => !s.fechadaEm).toArray(),
+      db.estoqueContagens.toArray(),
+      db.vendas.toArray(),
     ])
     return {
       produtos: produtos.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
       catalogo: montarCatalogo(insumos, fichas),
       config: paraConfigDominio(config),
       sessao: sessoes.sort((a, b) => b.abertaEm - a.abertaEm)[0],
+      estoque: estoqueAtual(contagens, vendas),
     }
   }, [])
 
@@ -224,7 +228,13 @@ export function Vender() {
         ) : (
           <ul className="grid grid-cols-2 gap-3 px-4 pt-4 sm:grid-cols-3 xl:grid-cols-4">
             {visiveis.map((p) => (
-              <BotaoProduto key={p.id} produto={p} quantidade={carrinho[p.id] ?? 0} onToque={() => alterar(p.id, 1)} />
+              <BotaoProduto
+                key={p.id}
+                produto={p}
+                quantidade={carrinho[p.id] ?? 0}
+                estoque={dados.estoque.get(p.id)}
+                onToque={() => alterar(p.id, 1)}
+              />
             ))}
           </ul>
         )}
@@ -264,15 +274,25 @@ export function Vender() {
   )
 }
 
+/**
+ * Produto sem estoque continua vendavel, so avisa. Se o bolo esta na vitrine
+ * e o sistema diz zero, quem esta errado e o sistema — travar a venda no
+ * balcao por causa de uma contagem desatualizada seria pior que o furo.
+ */
 function BotaoProduto({
   produto,
   quantidade,
+  estoque,
   onToque,
 }: {
   produto: ProdutoLocal
   quantidade: number
+  /** undefined = estoque nao controlado */
+  estoque: number | undefined
   onToque: () => void
 }) {
+  // ja descontando o que esta no pedido em andamento
+  const restam = estoque === undefined ? undefined : estoque - quantidade
   return (
     <li>
       <button
@@ -281,8 +301,19 @@ function BotaoProduto({
                     transition-transform active:scale-95 ${quantidade > 0 ? 'ring-2 ring-marca-500' : ''}`}
       >
         <span className="line-clamp-2 leading-tight font-semibold">{produto.nome}</span>
-        <span className="text-lg font-bold tabular-nums text-marca-700">
-          {formatarBRL(produto.precoCentavos)}
+        <span className="flex items-end justify-between gap-2">
+          <span className="text-lg font-bold tabular-nums text-marca-700">
+            {formatarBRL(produto.precoCentavos)}
+          </span>
+          {restam !== undefined && (
+            <span
+              className={`text-xs font-semibold ${
+                restam < 0 ? 'text-red-700' : restam <= 3 ? 'text-amber-700' : 'text-slate-500'
+              }`}
+            >
+              {restam < 0 ? `faltam ${-restam}` : restam === 0 ? 'acabou' : `restam ${restam}`}
+            </span>
+          )}
         </span>
         {quantidade > 0 && (
           <span
