@@ -504,6 +504,46 @@ export const venda = pgTable(
 )
 
 /**
+ * Despesa do mes (aluguel, luz, parcela de equipamento, compra de insumo).
+ * Registro editavel, LWW por `atualizado_em`.
+ *
+ * `mes` e texto 'AAAA-MM' e nao data: e o mes de COMPETENCIA, sem dia nem
+ * fuso. Como timestamp, a despesa de "outubro" lancada no dia 1 a meia-noite
+ * de Sao Paulo cairia em setembro para quem lesse em UTC.
+ */
+export const despesa = pgTable(
+  'despesa',
+  {
+    id: uuid('id').primaryKey(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenant.id, { onDelete: 'cascade' }),
+    descricao: text('descricao').notNull(),
+    categoria: text('categoria').notNull(),
+    valorCentavos: integer('valor_centavos').notNull(),
+    mes: text('mes').notNull(),
+    repete: boolean('repete').notNull().default(false),
+    /** liga as ocorrencias da mesma despesa entre os meses */
+    serieId: uuid('serie_id').notNull(),
+    parcela: integer('parcela'),
+    parcelas: integer('parcelas'),
+    pagoEm: timestamp('pago_em', { withTimezone: true }),
+    criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
+    atualizadoEm: timestamp('atualizado_em', { withTimezone: true }).notNull().defaultNow(),
+    excluidoEm: timestamp('excluido_em', { withTimezone: true }),
+  },
+  (t) => [
+    index('despesa_tenant_mes_idx').on(t.tenantId, t.mes),
+    check('despesa_valor_nao_negativo', sql`valor_centavos >= 0`),
+    check('despesa_mes_formato', sql`mes ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
+    check(
+      'despesa_parcela_coerente',
+      sql`(parcela IS NULL AND parcelas IS NULL) OR (parcela >= 1 AND parcela <= parcelas)`,
+    ),
+  ],
+)
+
+/**
  * Contagem de estoque: "neste momento havia N". O saldo nunca e coluna — e a
  * ultima contagem menos as vendas posteriores (ver src/dominio/estoque.ts).
  * `quantidade` nula significa que o produto deixou de ter estoque controlado.

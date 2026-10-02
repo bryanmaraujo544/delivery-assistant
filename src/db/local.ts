@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { Dimensao, ItemFicha, MarkupBase, TipoPerda } from '../dominio/custo'
 import type { ContagemEstoque } from '../dominio/estoque'
+import type { Despesa } from '../dominio/financeiro'
 import type { MovimentoCaixa, SessaoCaixa, Venda } from '../dominio/venda'
 
 /**
@@ -121,6 +122,13 @@ export interface ProdutoLocal {
 }
 
 /**
+ * Despesa e registro editavel (corrigir o valor da conta de luz, marcar como
+ * paga), entao segue o LWW de insumos e produtos — nao e fato imutavel como a
+ * venda.
+ */
+export type DespesaLocal = Despesa & { atualizadoEm: number; excluidoEm?: number | null }
+
+/**
  * `pendente` (1 = ainda nao confirmado pelo servidor) em vez de comparar
  * `atualizadoEm` com o ultimo sync, como fazem insumos e fichas.
  *
@@ -150,6 +158,7 @@ const db = new Dexie('precifica') as Dexie & {
   caixaMovimentos: EntityTable<MovimentoCaixaLocal, 'id'>
   vendas: EntityTable<VendaLocal, 'id'>
   estoqueContagens: EntityTable<ContagemEstoqueLocal, 'id'>
+  despesas: EntityTable<DespesaLocal, 'id'>
 }
 
 db.version(1).stores({
@@ -278,6 +287,20 @@ db.version(7).stores({
   caixaMovimentos: 'id, sessaoId, pendente',
   vendas: 'id, sessaoId, criadaEm, pendente',
   estoqueContagens: 'id, produtoId, pendente',
+})
+
+/** v8 — despesas do mes. */
+db.version(8).stores({
+  insumos: 'id, nomeNormalizado, categoria, favorito, excluidoEm',
+  usoInsumos: 'id, insumoId, contexto',
+  fichas: 'id, nome, categoria, ehBase, excluidoEm',
+  config: 'id',
+  produtos: 'id, nomeNormalizado, categoria, excluidoEm',
+  caixaSessoes: 'id, abertaEm, pendente',
+  caixaMovimentos: 'id, sessaoId, pendente',
+  vendas: 'id, sessaoId, criadaEm, pendente',
+  estoqueContagens: 'id, produtoId, pendente',
+  despesas: 'id, mes, serieId',
 })
 
 export const CONFIG_PADRAO: ConfigLocal = {
