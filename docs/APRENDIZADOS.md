@@ -332,6 +332,27 @@ Venda que desaparece sem rastro é exatamente o que impede de conferir o caixa d
 - **Primeiro fundo ficou branco demais** ("cara simplista"): sobre fundo quase branco, vidro é só cartão branco. A primeira correção exagerou para um rosa saturado, com cara de chiclete. O ponto certo foi um degradê claro com manchas de croma contido (≤ 0,11) e um grão leve contra banding
 - **Cabeçalho em faixa reta** ficava feio: um retângulo de borda dura, mais estreito que a janela, boiando no papel de parede. Virou placa de vidro flutuante e arredondada, como a barra lateral
 
+### [2026-10-01] Estoque: saldo derivado, nunca gravado
+
+Controle opcional por produto (pronta entrega sim, encomenda não). O que se grava é a **contagem** ("agora tem 12"); o saldo é a última contagem menos as vendas posteriores (`src/dominio/estoque.ts`).
+
+- **Excluir venda devolve o estoque** sem código de estorno: a venda cancelada sai da soma
+- Repor, corrigir e começar a controlar são a mesma operação: uma contagem nova. `quantidade: null` desliga o controle
+- **Salvar o produto só grava contagem se o número mudou.** Senão, trocar o preço "recontaria" o estoque e apagaria as vendas desde a última contagem
+- **Produto zerado continua vendável**, só avisa ("acabou", "faltam 2"). Se o bolo está na vitrine e o sistema diz zero, o errado é o sistema. Decisão minha — o Bryan pode preferir travar
+- Saldo negativo é informação: a contagem estava errada
+- No primeiro pull de um aparelho, a janela de vendas recua até a contagem mais antiga ainda em vigor; sem isso o aparelho novo mostraria estoque a mais
+
+### [2026-10-01] Liquid glass, segunda rodada — REVOGA "sólido no conteúdo"
+
+A regra abaixo (cartão de conteúdo quase opaco) caiu no teste do Bryan: o branco chapado destoava do vidro em volta. Ela vinha do medo de dinheiro ilegível sobre fundo translúcido; com o papel de parede claro e de croma contido, texto escuro mantém contraste alto em qualquer ponto.
+
+Agora são quatro densidades do mesmo vidro: `vidro` (moldura), `vidro-barra` (faixa), `vidro-cartao` (conteúdo, blur menor porque há dezenas na tela) e `vidro-folha` (diálogos, o mais denso, porque tem formulário dentro).
+
+**Sombras:** as padrão do Tailwind são pretas e fortes, e sobre fundo claro ficam grosseiras. A espessura da placa vem do brilho na aresta de cima; a sombra externa é larga, fraca e puxada para o violeta do fundo. Os tokens `--shadow-*` foram redefinidos no `@theme`.
+
+**Continua não medido:** custo de dezenas de `backdrop-filter` em Android de entrada.
+
 ### [2026-10-01] Liquid glass: vidro na moldura, sólido no conteúdo
 
 - **Vidro** (`vidro`, `vidro-barra`): navegação, cabeçalhos, painel do pedido

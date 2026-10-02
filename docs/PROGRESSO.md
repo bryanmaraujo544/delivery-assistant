@@ -38,6 +38,9 @@ Decisões e aprendizados vão em [APRENDIZADOS.md](APRENDIZADOS.md) — aqui fic
 - [x] Vendas: resumo do dia, mais vendidos, histórico, cancelamento com motivo
 - [x] Sincronização de produtos, caixa e vendas (fatos idempotentes)
 - [x] Migration `0005` aplicada no Neon em 01/10/2026 (autorizada pelo Bryan) — conferido no banco: 4 tabelas novas, 19 no total, 6 migrations registradas
+- [x] Excluir venda (some da lista, fica em "Ver N excluídas"), inclusive após o caixa fechado
+- [x] Estoque opcional por produto, com baixa na venda e devolução ao excluir
+- [ ] **Aplicar a migration `0006` (`estoque_contagem`) no Neon** ← precisa do ok do Bryan
 - [ ] **Merge em `main` e deploy** ← só com ordem do Bryan. **A API sobe antes do front** (ver log)
 - [ ] Teste em aparelho real (celular Android barato: o blur do vidro pesa)
 
