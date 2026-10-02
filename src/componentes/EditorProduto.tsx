@@ -142,7 +142,13 @@ export function EditorProduto({
     <FormProduto
       inicial={inicial}
       categorias={[...new Set(dados.produtos.map((p) => p.categoria).filter(Boolean))] as string[]}
-      fichas={dados.fichas.filter((f) => !f.ehBase)}
+      // Todas as fichas, inclusive as marcadas como base. Esconder as base
+      // deixava sem opcao quem marca o proprio bolo como base (ele tambem e
+      // usado dentro de outras receitas) — e o seletor aparecia vazio sem
+      // explicar por que. As vendaveis vem primeiro.
+      fichas={[...dados.fichas].sort(
+        (a, b) => Number(a.ehBase) - Number(b.ehBase) || a.nome.localeCompare(b.nome, 'pt-BR'),
+      )}
       catalogo={dados.catalogo}
       config={dados.config}
       onFechar={onFechar}
@@ -326,6 +332,7 @@ function FormProduto({
             {fichas.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.nome}
+                {f.ehBase ? ' (base)' : ''}
               </option>
             ))}
           </select>

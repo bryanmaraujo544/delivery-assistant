@@ -157,6 +157,8 @@ describe('resumoVendas', () => {
       venda({ canceladaEm: 1 }),
     ])
     expect(r.quantidadeVendas).toBe(2)
+    // 2 bolos + 1 brigadeiro; o item da venda cancelada fica fora
+    expect(r.quantidadeItens).toBe(3)
     expect(r.quantidadeCanceladas).toBe(1)
     expect(r.totalCentavos).toBe(3500)
     expect(r.ticketMedioCentavos).toBe(1750)
