@@ -27,6 +27,10 @@ const router = createBrowserRouter([
         lazy: async () => ({ Component: (await import('./rotas/vendas')).Vendas }),
       },
       {
+        path: '/financeiro',
+        lazy: async () => ({ Component: (await import('./rotas/financeiro')).Financeiro }),
+      },
+      {
         path: '/produtos',
         lazy: async () => ({ Component: (await import('./rotas/produtos')).Produtos }),
       },
