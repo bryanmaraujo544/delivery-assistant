@@ -569,10 +569,12 @@ function Cobranca({
                   </button>
                 ))}
               </div>
-              {/* o troco vem ANTES do campo de outro valor: e o que a pessoa
-                  precisa ler, e no celular nao pode ficar abaixo da dobra */}
+              <label htmlFor="recebido" className="mb-1 block text-sm text-slate-600">
+                Outro valor
+              </label>
+              <CampoDinheiro id="recebido" selecionarAoFocar valorCentavos={recebido} onChange={setRecebido} />
               <div
-                className={`mb-3 rounded-2xl p-3 text-center ${
+                className={`mt-3 rounded-2xl p-3 text-center ${
                   recebido < parte ? 'bg-amber-50 text-amber-900' : 'bg-emerald-50 text-emerald-900'
                 }`}
                 aria-live="polite"
@@ -586,10 +588,6 @@ function Cobranca({
                   </>
                 )}
               </div>
-              <label htmlFor="recebido" className="mb-1 block text-sm text-slate-600">
-                Outro valor
-              </label>
-              <CampoDinheiro id="recebido" selecionarAoFocar valorCentavos={recebido} onChange={setRecebido} />
             </div>
           )}
         </>
