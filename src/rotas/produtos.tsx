@@ -156,7 +156,7 @@ export function Produtos() {
         {!dados && <p className="py-10 text-center text-slate-400">Carregando…</p>}
 
         {vazio && (
-          <div className="vidro-solido mt-10 rounded-3xl p-6 text-center">
+          <div className="vidro-cartao mt-10 rounded-3xl p-6 text-center">
             <h2 className="text-lg font-semibold">Nenhum produto ainda</h2>
             <p className="mt-2 text-sm text-slate-600">
               Produto é o que você vende no balcão, com o preço que a cliente paga.
@@ -183,7 +183,7 @@ export function Produtos() {
             <h2 className="px-1 pb-2 text-xs font-semibold tracking-wide text-slate-600 uppercase">
               {categoria}
             </h2>
-            <ul className="vidro-solido divide-y divide-slate-100 overflow-hidden rounded-2xl">
+            <ul className="vidro-cartao divide-y divide-white/70 overflow-hidden rounded-2xl">
               {itens.map((p) => {
                 const custo = catalogo ? custoDoProduto(p, catalogo, config) : null
                 return (
@@ -198,7 +198,7 @@ export function Produtos() {
                           fichaId: p.fichaId ?? null,
                         })
                       }
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-white"
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-white/50"
                     >
                       <span className="min-w-0 flex-1 truncate font-medium">{p.nome}</span>
                       <span className="shrink-0 text-right">

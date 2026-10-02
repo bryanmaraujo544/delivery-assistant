@@ -209,7 +209,7 @@ export function Vender() {
         </header>
 
         {dados.produtos.length === 0 ? (
-          <div className="vidro-solido mx-4 mt-10 rounded-3xl p-6 text-center">
+          <div className="vidro-cartao mx-4 mt-10 rounded-3xl p-6 text-center">
             <h2 className="text-lg font-semibold">Cadastre o que você vende</h2>
             <p className="mt-2 text-sm text-slate-600">
               Os produtos aparecem aqui como botões. É só tocar para vender.
@@ -277,7 +277,7 @@ function BotaoProduto({
     <li>
       <button
         onClick={onToque}
-        className={`vidro-solido relative flex h-28 w-full flex-col justify-between rounded-2xl p-3 text-left
+        className={`vidro-cartao relative flex h-28 w-full flex-col justify-between rounded-2xl p-3 text-left
                     transition-transform active:scale-95 ${quantidade > 0 ? 'ring-2 ring-marca-500' : ''}`}
       >
         <span className="line-clamp-2 leading-tight font-semibold">{produto.nome}</span>
@@ -335,7 +335,7 @@ function Pedido({
         ) : (
           <ul className="space-y-2">
             {itens.map((i) => (
-              <li key={i.produtoId} className="vidro-solido flex items-center gap-2 rounded-2xl p-2 pl-3">
+              <li key={i.produtoId} className="vidro-cartao flex items-center gap-2 rounded-2xl p-2 pl-3">
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{i.nome}</span>
                   <span className="block text-sm tabular-nums text-slate-600">

@@ -77,7 +77,7 @@ export function Vendas() {
           </section>
 
           {r.quantidadeVendas > 0 && (
-            <section className="vidro-solido rounded-2xl p-4">
+            <section className="vidro-cartao rounded-2xl p-4">
               <h2 className="text-xs font-semibold tracking-wide text-slate-600 uppercase">
                 Por forma de pagamento
               </h2>
@@ -97,7 +97,7 @@ export function Vendas() {
               <h2 className="px-1 pb-2 text-xs font-semibold tracking-wide text-slate-600 uppercase">
                 Mais vendidos
               </h2>
-              <ul className="vidro-solido divide-y divide-slate-100 rounded-2xl">
+              <ul className="vidro-cartao divide-y divide-white/70 rounded-2xl">
                 {r.produtos.slice(0, 8).map((p) => (
                   <li key={p.produtoId} className="flex items-center gap-3 px-4 py-2.5">
                     <span className="w-8 font-bold tabular-nums text-marca-700">{p.quantidade}×</span>
@@ -126,16 +126,16 @@ export function Vendas() {
               )}
             </div>
             {listadas.length === 0 ? (
-              <p className="vidro-solido rounded-2xl px-4 py-8 text-center text-slate-600">
+              <p className="vidro-cartao rounded-2xl px-4 py-8 text-center text-slate-600">
                 Nenhuma venda {ehHoje(dia) ? 'hoje ainda' : 'neste dia'}.
               </p>
             ) : (
-              <ul className="vidro-solido divide-y divide-slate-100 overflow-hidden rounded-2xl">
+              <ul className="vidro-cartao divide-y divide-white/70 overflow-hidden rounded-2xl">
                 {listadas.map((v) => (
                   <li key={v.id}>
                     <button
                       onClick={() => setAberta(v.id)}
-                      className={`flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-white ${
+                      className={`flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-white/50 ${
                         v.canceladaEm ? 'text-slate-400' : ''
                       }`}
                     >
@@ -185,7 +185,7 @@ function Cartao({
   destaque?: boolean
 }) {
   return (
-    <div className="vidro-solido rounded-2xl p-4">
+    <div className="vidro-cartao rounded-2xl p-4">
       <p className="text-xs text-slate-500">{rotulo}</p>
       <p className={`text-2xl font-bold tabular-nums ${destaque ? 'text-marca-700' : ''}`}>{valor}</p>
       {nota && <p className="mt-0.5 text-xs text-slate-500">{nota}</p>}

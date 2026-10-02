@@ -377,7 +377,7 @@ export function FichaEditor() {
 
 function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4">
+    <section className="vidro-cartao rounded-2xl p-4">
       <h2 className="mb-3 text-xs font-semibold tracking-wide text-slate-500 uppercase">{titulo}</h2>
       {children}
     </section>
@@ -747,7 +747,7 @@ function PainelCusto({
   const precoCanal = aplicarTaxaDeCanal(preco.precoUnitario, canal.taxa)
 
   return (
-    <section className="rounded-xl border border-marca-500/40 bg-white p-4">
+    <section className="vidro-cartao rounded-2xl p-4">
       <div className="flex items-baseline justify-between">
         <span className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
           Preço por {ficha.unidadeRendimento}

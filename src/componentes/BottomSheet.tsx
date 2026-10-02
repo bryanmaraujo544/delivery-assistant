@@ -45,7 +45,7 @@ export function BottomSheet({ aberto, titulo, onFechar, children, rodape }: Prop
         role="dialog"
         aria-modal="true"
         aria-label={titulo}
-        className="vidro-solido relative flex max-h-[92vh] w-full max-w-md flex-col rounded-t-3xl shadow-2xl lg:rounded-3xl"
+        className="vidro-folha relative flex max-h-[92vh] w-full max-w-md flex-col rounded-t-3xl shadow-2xl lg:rounded-3xl"
       >
         <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <h2 className="text-lg font-semibold">{titulo}</h2>

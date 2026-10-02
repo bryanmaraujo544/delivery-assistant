@@ -61,7 +61,7 @@ export function Caixa() {
               </p>
             )}
 
-            <section className="vidro-solido rounded-3xl p-5">
+            <section className="vidro-cartao rounded-3xl p-5">
               <p className="text-sm text-slate-600">Vendido neste caixa</p>
               <p className="text-4xl font-bold tabular-nums">{formatarBRL(r.totalVendidoCentavos)}</p>
               <p className="text-sm text-slate-600">
@@ -80,14 +80,14 @@ export function Caixa() {
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => setMovimento('sangria')}
-                className="vidro-solido rounded-2xl px-4 py-3 text-left"
+                className="vidro-cartao rounded-2xl px-4 py-3 text-left"
               >
                 <span className="block font-semibold">Retirar dinheiro</span>
                 <span className="block text-sm text-slate-500">Sangria: levar ao banco, pagar algo</span>
               </button>
               <button
                 onClick={() => setMovimento('suprimento')}
-                className="vidro-solido rounded-2xl px-4 py-3 text-left"
+                className="vidro-cartao rounded-2xl px-4 py-3 text-left"
               >
                 <span className="block font-semibold">Colocar dinheiro</span>
                 <span className="block text-sm text-slate-500">Suprimento: reforço de troco</span>
@@ -99,7 +99,7 @@ export function Caixa() {
                 <h2 className="px-1 pb-2 text-xs font-semibold tracking-wide text-slate-600 uppercase">
                   Retiradas e entradas
                 </h2>
-                <ul className="vidro-solido divide-y divide-slate-100 rounded-2xl">
+                <ul className="vidro-cartao divide-y divide-white/70 rounded-2xl">
                   {dados.movimentosAberta.map((m) => (
                     <li key={m.id} className="flex items-center gap-3 px-4 py-3">
                       <span className="min-w-0 flex-1">
@@ -132,7 +132,7 @@ export function Caixa() {
             <h2 className="px-1 pt-2 pb-2 text-xs font-semibold tracking-wide text-slate-600 uppercase">
               Fechamentos anteriores
             </h2>
-            <ul className="vidro-solido divide-y divide-slate-100 rounded-2xl">
+            <ul className="vidro-cartao divide-y divide-white/70 rounded-2xl">
               {dados.fechadas.map(({ sessao, resumo }) => (
                 <li key={sessao.id} className="flex items-center gap-3 px-4 py-3">
                   <span className="min-w-0 flex-1">

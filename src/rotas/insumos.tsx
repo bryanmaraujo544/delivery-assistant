@@ -189,7 +189,7 @@ export function Insumos() {
             <h2 className="px-1 pb-2 text-xs font-semibold tracking-wide text-marca-700 uppercase">
               ★ Favoritos
             </h2>
-            <ul className="overflow-hidden rounded-xl border border-marca-500/40 bg-white">
+            <ul className="vidro-cartao overflow-hidden rounded-2xl">
               {favoritos.map((i) => (
                 <LinhaInsumo key={i.id} insumo={i} onClick={() => abrirEdicao(i)} />
               ))}
@@ -203,7 +203,7 @@ export function Insumos() {
               <h2 className="px-1 pb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
                 {categoria}
               </h2>
-              <ul className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <ul className="vidro-cartao overflow-hidden rounded-2xl">
                 {itens.map((i) => (
                   <LinhaInsumo key={i.id} insumo={i} onClick={() => abrirEdicao(i)} />
                 ))}
@@ -298,7 +298,7 @@ function EstadoVazio({
   onCriar: () => void
 }) {
   return (
-    <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 text-center">
+    <div className="vidro-cartao mt-10 rounded-3xl p-6 text-center">
       <h2 className="text-lg font-semibold text-slate-900">Comece com o catálogo pronto</h2>
       <p className="mt-2 text-sm text-slate-600">
         Carregamos os insumos mais usados em confeitaria, já com tamanho de embalagem. Você só

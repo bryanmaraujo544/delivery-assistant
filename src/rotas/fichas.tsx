@@ -116,7 +116,7 @@ export function Fichas() {
         )}
 
         {!comecarAtivo && dados && dados.fichas.length === 0 && (
-          <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 text-center">
+          <div className="vidro-cartao mt-10 rounded-3xl p-6 text-center">
             <h2 className="text-lg font-semibold">Nenhuma ficha ainda</h2>
             <p className="mt-2 text-sm text-slate-600">
               A ficha técnica é onde você monta o produto e descobre quanto ele custa.
@@ -200,7 +200,7 @@ function LinhaFicha({
   // O botao de duplicar e IRMAO do de abrir, nao aninhado: <button> dentro de
   // <button> e HTML invalido e o navegador decide sozinho qual recebe o toque.
   return (
-    <li className="flex items-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <li className="vidro-cartao flex items-center overflow-hidden rounded-2xl">
       <button onClick={onAbrir} className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left">
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-slate-900">

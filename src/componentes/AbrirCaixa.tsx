@@ -12,7 +12,7 @@ export function AbrirCaixa() {
   const [fundo, setFundo] = useState(0)
 
   return (
-    <div className="vidro-solido mx-auto w-full max-w-md rounded-3xl p-6">
+    <div className="vidro-cartao mx-auto w-full max-w-md rounded-3xl p-6">
       <h2 className="text-xl font-bold">Abrir o caixa</h2>
       <label htmlFor="fundo" className="mt-4 mb-1.5 block text-slate-700">
         Quanto tem de dinheiro na gaveta para troco?

@@ -130,7 +130,7 @@ export function Navegacao({ email, onSair }: { email: string; onSair: () => void
                   setMaisAberto(false)
                   navigate(i.para)
                 }}
-                className="vidro-solido flex w-full items-center gap-3 rounded-2xl px-4 text-left font-medium"
+                className="vidro-cartao flex w-full items-center gap-3 rounded-2xl px-4 text-left font-medium"
               >
                 <Icone d={i.icone} />
                 {i.rotulo}
