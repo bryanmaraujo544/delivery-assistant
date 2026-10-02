@@ -1,8 +1,32 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
-import { API, gravarSessao } from '../auth/sessao'
+import { Navigate, useNavigate } from 'react-router'
+import { API, gravarSessao, lerSessao } from '../auth/sessao'
 
 const SENHA_MIN = 8
+
+/** So o e-mail. A senha NUNCA e guardada pelo app — isso e trabalho do navegador. */
+const CHAVE_EMAIL = 'precifica.ultimoEmail'
+
+/**
+ * Pede ao navegador para guardar e-mail e senha no gerenciador dele.
+ *
+ * Numa SPA o login e um fetch, sem navegacao de pagina, e o navegador muitas
+ * vezes nao percebe que houve um login e nao oferece salvar. A Credential
+ * Management API diz isso a ele explicitamente. So existe em Chromium; nos
+ * demais, os atributos `name` e `autocomplete` do formulario fazem o papel.
+ *
+ * A senha vai para o cofre do navegador (protegido pelo sistema), nao para o
+ * localStorage, onde qualquer script da pagina a leria.
+ */
+async function oferecerSalvarSenha(email: string, senha: string) {
+  try {
+    const Cred = (window as { PasswordCredential?: new (d: { id: string; password: string }) => Credential })
+      .PasswordCredential
+    if (Cred) await navigator.credentials.store(new Cred({ id: email, password: senha }))
+  } catch {
+    // recusa da pessoa ou do navegador nao pode atrapalhar o login
+  }
+}
 
 /**
  * Login por e-mail e senha.
@@ -19,7 +43,7 @@ const SENHA_MIN = 8
 export function Login() {
   const navigate = useNavigate()
   const [modo, setModo] = useState<'entrar' | 'registrar'>('entrar')
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(() => localStorage.getItem(CHAVE_EMAIL) ?? '')
   const [senha, setSenha] = useState('')
   const [verSenha, setVerSenha] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -43,6 +67,8 @@ export function Login() {
       }
       const d = (await r.json()) as { token: string; usuario: { id: string; email: string } }
       gravarSessao({ token: d.token, email: d.usuario.email, usuarioId: d.usuario.id })
+      localStorage.setItem(CHAVE_EMAIL, d.usuario.email)
+      void oferecerSalvarSenha(d.usuario.email, senha)
       // Conta recem-criada NAO tem nada no servidor: o onboarding pode aparecer
       // sem esperar sincronizacao. Sem esta marca, quem se cadastra offline (ou
       // com a API fora do ar) cai na tela vazia crua em vez do onboarding.
@@ -56,6 +82,10 @@ export function Login() {
     }
   }
 
+  // Quem ja esta logada e cai aqui (link antigo, voltar do navegador, digitar
+  // o endereco) volta para o app em vez de ver um formulario de login.
+  if (lerSessao()) return <Navigate to="/" replace />
+
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6">
       <h1 className="text-3xl font-bold text-marca-700">Precifica</h1>
@@ -67,9 +97,12 @@ export function Login() {
         </label>
         <input
           id="email"
+          // `name` e `username`: e por estes dois que o gerenciador de senhas
+          // reconhece o campo de login e oferece preencher
+          name="username"
           type="email"
           inputMode="email"
-          autoComplete="email"
+          autoComplete="username"
           autoCapitalize="none"
           required
           value={email}
@@ -84,6 +117,7 @@ export function Login() {
         <div className="relative">
           <input
             id="senha"
+            name="password"
             type={verSenha ? 'text' : 'password'}
             // o gerenciador de senhas do celular precisa saber se e login ou
             // cadastro para oferecer preenchimento ou sugerir senha forte
