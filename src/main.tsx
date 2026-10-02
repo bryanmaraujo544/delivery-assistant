@@ -13,7 +13,23 @@ const router = createBrowserRouter([
     // tudo aqui dentro exige sessao e mantem a sincronizacao rodando
     element: <Guardiao />,
     children: [
-      { path: '/', element: <Navigate to="/fichas" replace /> },
+      { path: '/', element: <Navigate to="/vender" replace /> },
+      {
+        path: '/vender',
+        lazy: async () => ({ Component: (await import('./rotas/vender')).Vender }),
+      },
+      {
+        path: '/caixa',
+        lazy: async () => ({ Component: (await import('./rotas/caixa')).Caixa }),
+      },
+      {
+        path: '/vendas',
+        lazy: async () => ({ Component: (await import('./rotas/vendas')).Vendas }),
+      },
+      {
+        path: '/produtos',
+        lazy: async () => ({ Component: (await import('./rotas/produtos')).Produtos }),
+      },
       {
         path: '/fichas',
         lazy: async () => ({ Component: (await import('./rotas/fichas')).Fichas }),
