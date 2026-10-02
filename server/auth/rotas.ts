@@ -200,9 +200,11 @@ export async function autenticar(header: string | undefined): Promise<ContextoAu
 
   if (!linha) return null
 
+  // Renova a validade a cada uso. Contando so da criacao, quem usa a loja
+  // todos os dias era deslogado no meio do expediente ao completar o prazo.
   await db
     .update(sessao)
-    .set({ ultimoUsoEm: new Date() })
+    .set({ ultimoUsoEm: new Date(), expiraEm: new Date(Date.now() + SESSAO_VALIDADE_MS) })
     .where(eq(sessao.tokenHash, hashToken(token)))
 
   return linha
