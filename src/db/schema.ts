@@ -13,6 +13,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
+import type { ItemVenda, Pagamento } from '../dominio/venda'
 
 /* ────────────────────────────── enums ────────────────────────────── */
 
@@ -381,6 +382,122 @@ export const canal = pgTable(
     index('canal_tenant_idx').on(t.tenantId),
     // >= 100% tornaria a divisao (1 - taxa) zero ou negativa
     check('canal_taxa_faixa', sql`taxa_percentual >= 0 AND taxa_percentual < 100`),
+  ],
+)
+
+/* ─────────────────────────────── PDV ─────────────────────────────── */
+
+/**
+ * Produto de venda. NAO e a ficha tecnica: revenda (refrigerante, vela) tem
+ * preco e nao tem receita. O vinculo com a ficha e opcional.
+ */
+export const produto = pgTable(
+  'produto',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenant.id, { onDelete: 'cascade' }),
+    nome: text('nome').notNull(),
+    nomeNormalizado: text('nome_normalizado').notNull(),
+    categoria: text('categoria'),
+    precoCentavos: integer('preco_centavos').notNull(),
+    /** sem FK: a ficha pode chegar em outro lote, e ela so e apagada por soft delete */
+    fichaId: uuid('ficha_id'),
+    criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
+    atualizadoEm: timestamp('atualizado_em', { withTimezone: true }).notNull().defaultNow(),
+    excluidoEm: timestamp('excluido_em', { withTimezone: true }),
+  },
+  (t) => [
+    index('produto_tenant_idx').on(t.tenantId),
+    check('produto_preco_nao_negativo', sql`preco_centavos >= 0`),
+  ],
+)
+
+export const tipoMovimentoCaixa = pgEnum('tipo_movimento_caixa', ['sangria', 'suprimento'])
+
+/**
+ * Sessao de caixa, movimentos e vendas sao FATOS: entram por insert
+ * idempotente (o id nasce no cliente) e nao sao editados. As unicas
+ * transicoes sao fechar a sessao e cancelar a venda, cada uma no maximo uma
+ * vez. O saldo da gaveta nunca e coluna — e soma dos fatos.
+ *
+ * `sincronizado_em` e carimbo do SERVIDOR e e por ele que o pull filtra. As
+ * datas do negocio (aberta_em, criada_em) vem do aparelho e servem so para
+ * exibir; usa-las como cursor faria um relogio errado esconder vendas.
+ */
+export const caixaSessao = pgTable(
+  'caixa_sessao',
+  {
+    id: uuid('id').primaryKey(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenant.id, { onDelete: 'cascade' }),
+    abertaEm: timestamp('aberta_em', { withTimezone: true }).notNull(),
+    fundoTrocoCentavos: integer('fundo_troco_centavos').notNull(),
+    fechadaEm: timestamp('fechada_em', { withTimezone: true }),
+    contadoCentavos: integer('contado_centavos'),
+    observacao: text('observacao'),
+    sincronizadoEm: timestamp('sincronizado_em', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('caixa_sessao_sync_idx').on(t.tenantId, t.sincronizadoEm),
+    check('caixa_sessao_fundo_nao_negativo', sql`fundo_troco_centavos >= 0`),
+    check('caixa_sessao_contado_nao_negativo', sql`contado_centavos IS NULL OR contado_centavos >= 0`),
+  ],
+)
+
+export const caixaMovimento = pgTable(
+  'caixa_movimento',
+  {
+    id: uuid('id').primaryKey(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenant.id, { onDelete: 'cascade' }),
+    sessaoId: uuid('sessao_id')
+      .notNull()
+      .references(() => caixaSessao.id, { onDelete: 'cascade' }),
+    tipo: tipoMovimentoCaixa('tipo').notNull(),
+    valorCentavos: integer('valor_centavos').notNull(),
+    motivo: text('motivo').notNull(),
+    criadoEm: timestamp('criado_em', { withTimezone: true }).notNull(),
+    sincronizadoEm: timestamp('sincronizado_em', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('caixa_movimento_sync_idx').on(t.tenantId, t.sincronizadoEm),
+    check('caixa_movimento_valor_positivo', sql`valor_centavos > 0`),
+  ],
+)
+
+/**
+ * `itens` e `pagamentos` sao jsonb, nao tabelas: sao a fotografia da venda
+ * (nome, preco e custo da hora), sempre lidos e gravados inteiros, e nunca
+ * mudam. Tabela separada so compraria joins.
+ */
+export const venda = pgTable(
+  'venda',
+  {
+    id: uuid('id').primaryKey(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenant.id, { onDelete: 'cascade' }),
+    sessaoId: uuid('sessao_id')
+      .notNull()
+      .references(() => caixaSessao.id, { onDelete: 'restrict' }),
+    itens: jsonb('itens').$type<ItemVenda[]>().notNull(),
+    descontoCentavos: integer('desconto_centavos').notNull().default(0),
+    totalCentavos: integer('total_centavos').notNull(),
+    pagamentos: jsonb('pagamentos').$type<Pagamento[]>().notNull(),
+    trocoCentavos: integer('troco_centavos').notNull().default(0),
+    criadaEm: timestamp('criada_em', { withTimezone: true }).notNull(),
+    canceladaEm: timestamp('cancelada_em', { withTimezone: true }),
+    motivoCancelamento: text('motivo_cancelamento'),
+    sincronizadoEm: timestamp('sincronizado_em', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('venda_sync_idx').on(t.tenantId, t.sincronizadoEm),
+    index('venda_tenant_data_idx').on(t.tenantId, t.criadaEm),
+    check('venda_valores_nao_negativos', sql`total_centavos >= 0 AND desconto_centavos >= 0 AND troco_centavos >= 0`),
   ],
 )
 

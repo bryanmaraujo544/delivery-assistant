@@ -36,6 +36,13 @@
       "when": 1787429365520,
       "tag": "0004_luxuriant_mad_thinker",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790901921774,
+      "tag": "0005_wide_vin_gonzales",
+      "breakpoints": true
     }
   ]
 }

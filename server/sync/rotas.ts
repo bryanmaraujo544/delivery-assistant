@@ -1,17 +1,46 @@
-import { and, eq, gt, inArray, lt } from 'drizzle-orm'
+import { and, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import {
+  caixaMovimento,
+  caixaSessao,
   configProducao,
   fichaItem,
   fichaPerda,
   fichaTecnica,
   insumo,
   precificacao,
+  produto,
+  venda,
 } from '../../src/db/schema'
+import { validarVenda } from '../../src/dominio/venda'
 import { autenticar } from '../auth/rotas'
 import { db } from '../db'
-import { num, zPush, type FichaSync, type InsumoSync } from './mapeamento'
+import {
+  num,
+  zPush,
+  type FichaSync,
+  type InsumoSync,
+  type MovimentoCaixaSync,
+  type ProdutoSync,
+  type SessaoCaixaSync,
+  type VendaSync,
+} from './mapeamento'
+
+/**
+ * No primeiro pull de um aparelho (desde = 0) so desce o historico recente de
+ * caixa e vendas. Catalogo desce inteiro, mas vendas crescem sem limite: uma
+ * loja com um ano de movimento nao pode travar o login baixando tudo.
+ */
+const JANELA_PRIMEIRO_PULL_MS = 60 * 24 * 60 * 60 * 1000
+
+/**
+ * O pull de fatos volta alguns minutos alem do cursor. Um push em andamento
+ * carimba `sincronizado_em` no inicio da transacao e so aparece no commit; sem
+ * a folga, um pull que caisse nesse intervalo avancaria o cursor e nunca mais
+ * veria aquela venda. Reentregar e inofensivo: o cliente aplica por id.
+ */
+const FOLGA_PULL_MS = 5 * 60 * 1000
 
 /**
  * Sincronizacao.
@@ -42,7 +71,31 @@ export async function registrarRotasSync(app: FastifyInstance) {
     if (!parse.success) {
       return reply.code(400).send({ erro: 'payload inválido', detalhe: parse.error.issues.slice(0, 5) })
     }
-    const { insumos, fichas, config } = parse.data
+    const { insumos, fichas, config, produtos, sessoes, movimentos, vendas } = parse.data
+
+    // a aritmetica da venda e conferida aqui, com a MESMA funcao do cliente:
+    // o servidor nunca grava um total so porque ele veio no corpo
+    try {
+      for (const v of vendas) validarVenda(v)
+    } catch (e) {
+      return reply.code(400).send({ erro: `venda inválida: ${(e as Error).message}` })
+    }
+
+    // venda e movimento apontam para uma sessao. A FK garante que ela existe,
+    // mas nao que e DESTE tenant — sem esta checagem daria para pendurar uma
+    // venda no caixa de outra conta.
+    const idsSessao = [...new Set([...vendas, ...movimentos].map((x) => x.sessaoId))]
+    const noLote = new Set(sessoes.map((s) => s.id))
+    const faltam = idsSessao.filter((id) => !noLote.has(id))
+    if (faltam.length > 0) {
+      const achadas = await db
+        .select({ id: caixaSessao.id })
+        .from(caixaSessao)
+        .where(and(eq(caixaSessao.tenantId, ctx.tenantId), inArray(caixaSessao.id, faltam)))
+      if (achadas.length !== faltam.length) {
+        return reply.code(400).send({ erro: 'sessão de caixa desconhecida' })
+      }
+    }
 
     await db.transaction(async (tx) => {
       for (const i of insumos) await gravarInsumo(tx, ctx.tenantId, i)
@@ -54,9 +107,27 @@ export async function registrarRotasSync(app: FastifyInstance) {
           .values({ tenantId: ctx.tenantId, ...config, perdaPadraoPercentual: '4.000' })
           .onConflictDoUpdate({ target: configProducao.tenantId, set: config })
       }
+      for (const p of produtos) await gravarProduto(tx, ctx.tenantId, p)
+      // sessoes antes de movimentos e vendas, que apontam para elas
+      for (const s of sessoes) await gravarSessao(tx, ctx.tenantId, s)
+      for (const m of movimentos) await gravarMovimento(tx, ctx.tenantId, m)
+      for (const v of vendas) await gravarVenda(tx, ctx.tenantId, v)
     })
 
-    return { ok: true, recebidos: { insumos: insumos.length, fichas: fichas.length } }
+    return {
+      ok: true,
+      // o cliente so da uma venda por entregue se ESTE servidor disser que a
+      // recebeu: um servidor de versao anterior ignoraria os campos novos e
+      // responderia ok mesmo assim
+      recebidos: {
+        insumos: insumos.length,
+        fichas: fichas.length,
+        produtos: produtos.length,
+        sessoes: sessoes.length,
+        movimentos: movimentos.length,
+        vendas: vendas.length,
+      },
+    }
   })
 
   app.get('/sync/pull', async (req, reply) => {
@@ -64,6 +135,31 @@ export async function registrarRotasSync(app: FastifyInstance) {
     const parse = z.object({ desde: z.coerce.number().int().min(0).default(0) }).safeParse(req.query)
     if (!parse.success) return reply.code(400).send({ erro: 'parâmetro "desde" inválido' })
     const desde = new Date(parse.data.desde)
+
+    const desdeEventos =
+      parse.data.desde === 0
+        ? new Date(Date.now() - JANELA_PRIMEIRO_PULL_MS)
+        : new Date(parse.data.desde - FOLGA_PULL_MS)
+    const [produtosDb, sessoesDb, movimentosDb, vendasDb] = await Promise.all([
+      db
+        .select()
+        .from(produto)
+        .where(and(eq(produto.tenantId, ctx.tenantId), gt(produto.atualizadoEm, desde))),
+      db
+        .select()
+        .from(caixaSessao)
+        .where(and(eq(caixaSessao.tenantId, ctx.tenantId), gt(caixaSessao.sincronizadoEm, desdeEventos))),
+      db
+        .select()
+        .from(caixaMovimento)
+        .where(
+          and(eq(caixaMovimento.tenantId, ctx.tenantId), gt(caixaMovimento.sincronizadoEm, desdeEventos)),
+        ),
+      db
+        .select()
+        .from(venda)
+        .where(and(eq(venda.tenantId, ctx.tenantId), gt(venda.sincronizadoEm, desdeEventos))),
+    ])
 
     const [insumosDb, fichasDb, cfg] = await Promise.all([
       db
@@ -150,6 +246,44 @@ export async function registrarRotasSync(app: FastifyInstance) {
             unidadesMes: cfg[0].unidadesMes,
           }
         : null,
+      produtos: produtosDb.map((p) => ({
+        id: p.id,
+        nome: p.nome,
+        nomeNormalizado: p.nomeNormalizado,
+        categoria: p.categoria,
+        precoCentavos: p.precoCentavos,
+        fichaId: p.fichaId,
+        atualizadoEm: p.atualizadoEm.getTime(),
+        excluidoEm: p.excluidoEm?.getTime() ?? null,
+      })),
+      sessoes: sessoesDb.map((s) => ({
+        id: s.id,
+        abertaEm: s.abertaEm.getTime(),
+        fundoTrocoCentavos: s.fundoTrocoCentavos,
+        fechadaEm: s.fechadaEm?.getTime() ?? null,
+        contadoCentavos: s.contadoCentavos,
+        observacao: s.observacao,
+      })),
+      movimentos: movimentosDb.map((m) => ({
+        id: m.id,
+        sessaoId: m.sessaoId,
+        tipo: m.tipo,
+        valorCentavos: m.valorCentavos,
+        motivo: m.motivo,
+        criadoEm: m.criadoEm.getTime(),
+      })),
+      vendas: vendasDb.map((v) => ({
+        id: v.id,
+        sessaoId: v.sessaoId,
+        itens: v.itens,
+        descontoCentavos: v.descontoCentavos,
+        totalCentavos: v.totalCentavos,
+        pagamentos: v.pagamentos,
+        trocoCentavos: v.trocoCentavos,
+        criadaEm: v.criadaEm.getTime(),
+        canceladaEm: v.canceladaEm?.getTime() ?? null,
+        motivoCancelamento: v.motivoCancelamento,
+      })),
     }
   })
 }
@@ -243,4 +377,99 @@ async function gravarFicha(tx: Tx, tenantId: string, f: FichaSync) {
     target: precificacao.fichaId,
     set: { base: preco.base, multiplicador: preco.multiplicador },
   })
+}
+
+async function gravarProduto(tx: Tx, tenantId: string, p: ProdutoSync) {
+  const linha = {
+    id: p.id,
+    tenantId,
+    nome: p.nome,
+    nomeNormalizado: p.nomeNormalizado,
+    categoria: p.categoria ?? null,
+    precoCentavos: p.precoCentavos,
+    fichaId: p.fichaId ?? null,
+    atualizadoEm: new Date(p.atualizadoEm),
+    excluidoEm: p.excluidoEm ? new Date(p.excluidoEm) : null,
+  }
+  await tx
+    .insert(produto)
+    .values(linha)
+    .onConflictDoUpdate({
+      target: produto.id,
+      set: linha,
+      // LWW, e SO dentro do proprio tenant: sem o filtro, quem acertasse o id
+      // de um produto alheio o sobrescreveria e o levaria para a propria conta
+      setWhere: and(eq(produto.tenantId, tenantId), lt(produto.atualizadoEm, new Date(p.atualizadoEm))),
+    })
+}
+
+/**
+ * Fatos entram por insert idempotente: reenviar o mesmo lote (conexao caiu
+ * antes da resposta) nao duplica nada. As transicoes — fechar, cancelar — so
+ * acontecem uma vez (`IS NULL`) e sempre filtradas pelo tenant.
+ */
+async function gravarSessao(tx: Tx, tenantId: string, s: SessaoCaixaSync) {
+  await tx
+    .insert(caixaSessao)
+    .values({
+      id: s.id,
+      tenantId,
+      abertaEm: new Date(s.abertaEm),
+      fundoTrocoCentavos: s.fundoTrocoCentavos,
+    })
+    .onConflictDoNothing()
+  if (s.fechadaEm) {
+    await tx
+      .update(caixaSessao)
+      .set({
+        fechadaEm: new Date(s.fechadaEm),
+        contadoCentavos: s.contadoCentavos ?? null,
+        observacao: s.observacao ?? null,
+        sincronizadoEm: sql`now()`,
+      })
+      .where(and(eq(caixaSessao.id, s.id), eq(caixaSessao.tenantId, tenantId), isNull(caixaSessao.fechadaEm)))
+  }
+}
+
+async function gravarMovimento(tx: Tx, tenantId: string, m: MovimentoCaixaSync) {
+  await tx
+    .insert(caixaMovimento)
+    .values({
+      id: m.id,
+      tenantId,
+      sessaoId: m.sessaoId,
+      tipo: m.tipo,
+      valorCentavos: m.valorCentavos,
+      motivo: m.motivo,
+      criadoEm: new Date(m.criadoEm),
+    })
+    .onConflictDoNothing()
+}
+
+async function gravarVenda(tx: Tx, tenantId: string, v: VendaSync) {
+  await tx
+    .insert(venda)
+    .values({
+      id: v.id,
+      tenantId,
+      sessaoId: v.sessaoId,
+      itens: v.itens,
+      descontoCentavos: v.descontoCentavos,
+      totalCentavos: v.totalCentavos,
+      pagamentos: v.pagamentos,
+      trocoCentavos: v.trocoCentavos,
+      criadaEm: new Date(v.criadaEm),
+    })
+    .onConflictDoNothing()
+  if (v.canceladaEm) {
+    await tx
+      .update(venda)
+      .set({
+        canceladaEm: new Date(v.canceladaEm),
+        motivoCancelamento: v.motivoCancelamento ?? null,
+        // recarimba para o cancelamento descer no pull dos outros aparelhos
+        sincronizadoEm: sql`now()`,
+      })
+      .where(and(eq(venda.id, v.id), eq(venda.tenantId, tenantId), isNull(venda.canceladaEm)))
+  }
 }
