@@ -332,6 +332,25 @@ Venda que desaparece sem rastro é exatamente o que impede de conferir o caixa d
 - **Primeiro fundo ficou branco demais** ("cara simplista"): sobre fundo quase branco, vidro é só cartão branco. A primeira correção exagerou para um rosa saturado, com cara de chiclete. O ponto certo foi um degradê claro com manchas de croma contido (≤ 0,11) e um grão leve contra banding
 - **Cabeçalho em faixa reta** ficava feio: um retângulo de borda dura, mais estreito que a janela, boiando no papel de parede. Virou placa de vidro flutuante e arredondada, como a barra lateral
 
+### [2026-10-02] Financeiro: DRE simplificada, e de onde vem cada número
+
+Pedido do Bryan: lançar luz, água, parcelas e saber o resultado de cada mês. Pesquisa rápida (VERIFICADO nas fontes abaixo): o modelo recomendado para pequeno negócio é a **DRE simplificada em cinco linhas** — faturamento, custo dos produtos, despesas fixas, despesas variáveis, lucro — e os sistemas de padaria do mercado oferecem contas a pagar, despesas recorrentes e parceladas, fluxo de caixa e DRE.
+
+Decisões:
+
+- **A pessoa escolhe a categoria, nunca o "tipo".** Luz, Aluguel, Ingredientes — fixa/variável/custo vem junto da categoria. Ninguém no balcão sabe o que é despesa variável
+- **Separar fixa de variável vale a pena** porque dá o **ponto de equilíbrio** (`fixas ÷ índice de margem de contribuição`), mostrado como "a loja precisa vender R$ X no mês, cerca de R$ Y por dia"
+- **Custo dos produtos = compras lançadas, não custo das fichas.** A ficha embute mão de obra e rateio de custo fixo; subtrair o custo da ficha **e** as despesas contaria luz e salário duas vezes. Consequência assumida: o resultado é mais próximo de caixa do que de competência (comprar farinha para dois meses pesa no mês da compra)
+- **Parcelada = uma despesa por mês**, criadas de uma vez. O valor informado é o da parcela, que é o número do carnê
+- **"Todo mês" não gera despesa sozinha.** Aparece um botão para trazer do mês anterior, e a pessoa confere o valor. Conta de luz muda; despesa fantasma com número velho é pior que um toque a mais
+- **Id derivado de série + mês** ao trazer as repetições: dois aparelhos offline geram o mesmo registro, não dois aluguéis
+- **Mês é texto `AAAA-MM`**: competência não tem dia nem fuso
+- O primeiro pull só traz 60 dias de vendas; o aparelho guarda desde quando tem vendas completas e a tela avisa quando o mês consultado é anterior
+
+**Não feito, e que o mercado tem:** contas a receber, conciliação bancária, vencimento com lembrete, anexar comprovante, transformar sangria do caixa em despesa.
+
+Fontes: [DRE simples — Contábeis](https://www.contabeis.com.br/artigos/78656/dre-simples-entenda-o-demonstrativo-de-resultado-do-exercicio/) · [Despesas fixas e variáveis — Kamino](https://kamino.com.br/blog/despesas-fixas-e-variaveis/) · [Custo variável em confeitaria — Sebrae PR](https://sebraepr.com.br/comunidade/artigo/como-calcular-o-custo-variavel-dos-produtos-de-confeitaria) · [ERP para panificadora — vhsys](https://blog.vhsys.com.br/sistema-erp-panificadora/) · [PDV para padaria — GestãoClick](https://gestaoclick.com.br/pdv-para-padaria/)
+
 ### [2026-10-01] Arrumar a tela de venda: modo separado, arrasto só pela alça
 
 - **Modo próprio ("Arrumar"), não arrasto direto na tela de venda.** No balcão, um toque longo ou um arrasto acidental não pode nem mover cartão nem pôr bolo no pedido. No modo de arrumar o cartão não vende

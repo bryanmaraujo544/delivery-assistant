@@ -43,6 +43,8 @@ Decisões e aprendizados vão em [APRENDIZADOS.md](APRENDIZADOS.md) — aqui fic
 - [x] Migration `0006` (`estoque_contagem`) aplicada no Neon em 01/10/2026 (autorizada pelo Bryan) — conferido no banco: 20 tabelas, 7 migrations registradas
 - [x] Arrumar a tela de venda arrastando os cartões; editar produto direto do balcão; faixa "Sem estoque"
 - [x] Migration `0007` (`produto.ordem`) aplicada no Neon em 01/10/2026 (autorizada pelo Bryan) — conferido: coluna `integer` anulável, 8 migrations registradas. PR #2 mergeado em seguida
+- [x] Financeiro: despesas do mês (única, todo mês, parcelada), resultado em DRE simplificada e ponto de equilíbrio — PR aberto
+- [ ] **Aplicar a migration `0008` (`despesa`) no Neon e mergear o PR do financeiro** ← precisa do ok do Bryan; a migration vem antes do merge
 - [ ] **Merge em `main` e deploy** ← só com ordem do Bryan. **A API sobe antes do front** (ver log)
 - [ ] Teste em aparelho real (celular Android barato: o blur do vidro pesa)
 
