@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { BottomSheet } from '../componentes/BottomSheet'
 import { CampoDinheiro } from '../componentes/CampoDinheiro'
 import { mostrarAviso } from '../componentes/Snackbar'
@@ -117,6 +118,10 @@ export function Financeiro() {
             </button>
           )}
 
+          {(dados.r.comprasCentavos > 0 || dados.r.custoProdutosCentavos > 0) && (
+            <ComprasVersusFichas r={dados.r} />
+          )}
+
           {dados.r.porCategoria.length > 0 && <PorCategoria r={dados.r} />}
 
           <section>
@@ -158,6 +163,7 @@ export function Financeiro() {
                         <span className="block truncate font-medium">{d.descricao}</span>
                         <span className="block text-sm text-slate-500">
                           {categoriaPorCodigo(d.categoria).rotulo}
+                          {categoriaPorCodigo(d.categoria).tipo === 'custo' ? ' · compra' : ''}
                           {d.parcelas ? ` · parcela ${d.parcela} de ${d.parcelas}` : ''}
                           {d.repete ? ' · todo mês' : ''}
                         </span>
@@ -232,7 +238,7 @@ function Resultado({ r, mes, emAndamento }: { r: ResultadoDoMes; mes: string; em
 
       <dl className="mt-4 space-y-1.5 text-sm">
         <Linha rotulo="Vendas" valor={r.faturamentoCentavos} forte />
-        <Linha rotulo="Ingredientes e embalagens" valor={r.custoProdutosCentavos} sinal="−" />
+        <Linha rotulo="Custo dos produtos vendidos (pelas fichas)" valor={r.custoProdutosCentavos} sinal="−" />
         <Linha rotulo="Taxas e entregas" valor={r.despesasVariaveisCentavos} sinal="−" />
         <div className="border-t border-slate-300/60 pt-1.5">
           <Linha rotulo="Sobra para pagar as contas fixas" valor={r.margemContribuicaoCentavos} forte />
@@ -242,6 +248,20 @@ function Resultado({ r, mes, emAndamento }: { r: ResultadoDoMes; mes: string; em
           <Linha rotulo="Resultado" valor={r.resultadoCentavos} forte />
         </div>
       </dl>
+
+      {/* O aviso mais importante da tela: sem custo, a venda entra como lucro
+          puro e o resultado mente para cima. */}
+      {r.faturamentoSemCustoCentavos > 0 && (
+        <p className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <strong>{formatarBRL(r.faturamentoSemCustoCentavos)}</strong> das vendas são de produtos
+          sem custo conhecido, então o resultado real é menor do que este. Em{' '}
+          <Link to="/produtos" className="font-medium underline">
+            Produtos
+          </Link>
+          , vincule uma ficha técnica ou informe o custo de cada um. Vendas antigas continuam sem
+          custo.
+        </p>
+      )}
 
       {/* Ponto de equilibrio em linguagem de balcao. So aparece quando ha base
           para calcular: com venda e com margem positiva. */}
@@ -257,8 +277,8 @@ function Resultado({ r, mes, emAndamento }: { r: ResultadoDoMes; mes: string; em
       )}
       {r.pontoEquilibrioCentavos == null && r.faturamentoCentavos > 0 && r.margemContribuicaoCentavos <= 0 && (
         <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-900">
-          Ingredientes, embalagens e taxas custaram mais do que as vendas renderam. Vender mais
-          não resolve: é preciso rever preços ou custos.
+          O custo dos produtos e as taxas passaram do que as vendas renderam. Vender mais não
+          resolve: é preciso rever preços ou custos.
         </p>
       )}
     </section>
@@ -277,13 +297,47 @@ function Linha({ rotulo, valor, sinal, forte }: { rotulo: string; valor: number;
   )
 }
 
+/**
+ * Compras de ingredientes e embalagens contra o que as vendas consumiram.
+ *
+ * A compra nao entra no resultado — o custo vem das fichas. Mas a diferenca
+ * entre as duas e a informacao que nenhuma delas da sozinha: sobra,
+ * desperdicio, estoque parado ou ficha desatualizada.
+ */
+function ComprasVersusFichas({ r }: { r: ResultadoDoMes }) {
+  const diferenca = r.comprasCentavos - r.custoProdutosCentavos
+  return (
+    <section className="vidro-cartao rounded-2xl p-4">
+      <h2 className="text-xs font-semibold tracking-wide text-slate-600 uppercase">
+        Ingredientes e embalagens
+      </h2>
+      <dl className="mt-2 space-y-1.5 text-sm">
+        <Linha rotulo="Usado nas vendas (pelas fichas)" valor={r.custoProdutosCentavos} />
+        <Linha rotulo="Comprado no mês" valor={r.comprasCentavos} />
+      </dl>
+      <p className="mt-3 text-sm text-slate-700">
+        {r.comprasCentavos === 0
+          ? 'Nenhuma compra lançada neste mês. Lance as compras de ingredientes para comparar.'
+          : diferenca > 0
+            ? `Você comprou ${formatarBRL(diferenca)} a mais do que as vendas usaram. Pode ser estoque para os próximos meses, sobra, desperdício ou ficha com quantidade desatualizada.`
+            : diferenca < 0
+              ? `As vendas usaram ${formatarBRL(-diferenca)} a mais do que você comprou. Pode ser estoque de meses anteriores ou compra ainda não lançada.`
+              : 'O que você comprou bate com o que as vendas usaram.'}
+      </p>
+      <p className="mt-2 text-xs text-slate-500">
+        As compras não entram no resultado: o custo de cada venda já vem da ficha técnica.
+      </p>
+    </section>
+  )
+}
+
 /** Para onde foi o dinheiro: barra proporcional a maior categoria. */
 function PorCategoria({ r }: { r: ResultadoDoMes }) {
   const maior = r.porCategoria[0]?.totalCentavos ?? 1
   return (
     <section className="vidro-cartao rounded-2xl p-4">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-xs font-semibold tracking-wide text-slate-600 uppercase">Para onde foi</h2>
+        <h2 className="text-xs font-semibold tracking-wide text-slate-600 uppercase">Contas do mês</h2>
         <p className="font-semibold tabular-nums">{formatarBRL(r.totalDespesasCentavos)}</p>
       </div>
       <ul className="mt-3 space-y-2.5">

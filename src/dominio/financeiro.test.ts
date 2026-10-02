@@ -12,10 +12,25 @@ import type { Venda } from './venda'
 
 const em = (ano: number, mes: number, dia: number) => new Date(ano, mes - 1, dia, 12).getTime()
 
-const venda = (totalCentavos: number, criadaEm: number, over: Partial<Venda> = {}): Venda => ({
+/** Venda de um item; `custoMateriais` e o custo de ingredientes gravado na venda (30% por padrao). */
+const venda = (
+  totalCentavos: number,
+  criadaEm: number,
+  over: Partial<Venda> = {},
+  custoMateriais: number | null = totalCentavos * 0.3,
+): Venda => ({
   id: `v${criadaEm}${totalCentavos}`,
   sessaoId: 's',
-  itens: [{ produtoId: 'p', nome: 'Bolo', precoUnitarioCentavos: totalCentavos, quantidade: 1, custoUnitarioCentavos: null }],
+  itens: [
+    {
+      produtoId: 'p',
+      nome: 'Bolo',
+      precoUnitarioCentavos: totalCentavos,
+      quantidade: 1,
+      custoUnitarioCentavos: null,
+      custoMateriaisCentavos: custoMateriais,
+    },
+  ],
   descontoCentavos: 0,
   totalCentavos,
   pagamentos: [{ forma: 'pix', valorCentavos: totalCentavos }],
@@ -51,8 +66,9 @@ describe('meses', () => {
 
 describe('resultadoDoMes', () => {
   const vendas = [venda(600_000, em(2026, 10, 5)), venda(400_000, em(2026, 10, 20))]
+  // vendas com 30% de custo de materiais gravado: 300.000 no total
   const despesas = [
-    despesa('insumos', 300_000),
+    despesa('insumos', 420_000), // compras: NAO entram no resultado
     despesa('taxas', 50_000),
     despesa('aluguel', 200_000),
     despesa('luz', 60_000, { pagoEm: null }),
@@ -62,12 +78,47 @@ describe('resultadoDoMes', () => {
     const r = resultadoDoMes('2026-10', vendas, despesas)
     expect(r.faturamentoCentavos).toBe(1_000_000)
     expect(r.custoProdutosCentavos).toBe(300_000)
+    expect(r.comprasCentavos).toBe(420_000)
+    expect(r.faturamentoSemCustoCentavos).toBe(0)
     expect(r.despesasVariaveisCentavos).toBe(50_000)
     expect(r.margemContribuicaoCentavos).toBe(650_000)
     expect(r.despesasFixasCentavos).toBe(260_000)
     expect(r.resultadoCentavos).toBe(390_000)
     expect(r.margemPercentual).toBeCloseTo(39)
     expect(r.aPagarCentavos).toBe(60_000)
+  })
+
+  it('o custo vem do que foi gravado na venda, nao das compras do mes', () => {
+    // comprar muito ou nada nao muda o resultado
+    const semCompras = resultadoDoMes('2026-10', vendas, despesas.filter((d) => d.categoria !== 'insumos'))
+    expect(semCompras.resultadoCentavos).toBe(390_000)
+    expect(semCompras.comprasCentavos).toBe(0)
+  })
+
+  it('custo e por unidade: multiplica pela quantidade', () => {
+    const v = venda(1000, em(2026, 10, 5))
+    v.itens[0]!.quantidade = 3
+    v.totalCentavos = 3000
+    expect(resultadoDoMes('2026-10', [v], []).custoProdutosCentavos).toBe(900)
+  })
+
+  it('item sem custo nao vira custo zero calado: o faturamento dele e apontado', () => {
+    // venda anterior a este campo: o item simplesmente nao o tem
+    const antiga = venda(60_000, em(2026, 10, 7))
+    delete antiga.itens[0]!.custoMateriaisCentavos
+    const r = resultadoDoMes('2026-10', [
+      venda(100_000, em(2026, 10, 5)),
+      venda(40_000, em(2026, 10, 6), {}, null), // produto sem ficha nem custo informado
+      antiga,
+    ], [])
+    expect(r.custoProdutosCentavos).toBe(30_000)
+    expect(r.faturamentoSemCustoCentavos).toBe(100_000)
+  })
+
+  it('faturamento sem custo acompanha o desconto da venda', () => {
+    // item de 10.000 sem custo, vendido com 2.000 de desconto
+    const v = venda(10_000, em(2026, 10, 5), { descontoCentavos: 2_000, totalCentavos: 8_000 }, null)
+    expect(resultadoDoMes('2026-10', [v], []).faturamentoSemCustoCentavos).toBe(8_000)
   })
 
   it('ponto de equilibrio: fixas dividido pelo indice de margem de contribuicao', () => {
@@ -92,14 +143,22 @@ describe('resultadoDoMes', () => {
 
   it('mes sem venda: prejuizo igual as despesas, sem margem nem ponto de equilibrio', () => {
     const r = resultadoDoMes('2026-10', [], despesas)
-    expect(r.resultadoCentavos).toBe(-610_000)
+    // 50.000 de taxas + 260.000 de fixas; as compras nao entram
+    expect(r.resultadoCentavos).toBe(-310_000)
     expect(r.margemPercentual).toBeNull()
     expect(r.pontoEquilibrioCentavos).toBeNull()
   })
 
   it('vendendo abaixo do custo nao ha ponto de equilibrio', () => {
-    const r = resultadoDoMes('2026-10', [venda(100_000, em(2026, 10, 5))], [despesa('insumos', 150_000)])
+    const r = resultadoDoMes('2026-10', [venda(100_000, em(2026, 10, 5), {}, 150_000)], [])
     expect(r.pontoEquilibrioCentavos).toBeNull()
+  })
+
+  it('compras ficam fora de "para onde foi" e do total de despesas', () => {
+    const r = resultadoDoMes('2026-10', [], [despesa('insumos', 500), despesa('luz', 300)])
+    expect(r.porCategoria.map((c) => c.codigo)).toEqual(['luz'])
+    expect(r.totalDespesasCentavos).toBe(300)
+    expect(r.comprasCentavos).toBe(500)
   })
 
   it('agrupa por categoria, da maior para a menor, e categoria desconhecida vira Outros', () => {

@@ -18,10 +18,19 @@ import type { Venda } from './venda'
  * de equilibrio, a pergunta que a dona da loja realmente faz — "quanto preciso
  * vender para o mes fechar?".
  *
- * O CUSTO DOS PRODUTOS VEM DAS COMPRAS LANCADAS, nao das fichas tecnicas. A
- * ficha ja embute mao de obra e rateio de custo fixo; subtrair o custo da
- * ficha E as despesas contaria luz e salario duas vezes. Compra lancada e o
- * dinheiro que de fato saiu.
+ * O CUSTO DOS PRODUTOS VEM DAS FICHAS TECNICAS, gravado em cada venda: mede
+ * o que cada venda consumiu, no mes em que aconteceu. Pelas compras o numero
+ * dependeria de quando se foi ao mercado — comprar farinha para dois meses
+ * faria um mes parecer ruim e o seguinte, otimo.
+ *
+ * Duas consequencias que a regra trata de frente:
+ *
+ *  - entra SO a parte de materiais da ficha (`custoMateriaisCentavos`). O
+ *    custo cheio embute mao de obra e rateio de custo fixo, e somar isso com
+ *    as despesas de luz e salario os contaria duas vezes;
+ *  - as COMPRAS de ingredientes e embalagens nao sao subtraidas. Ficam como
+ *    comparacao: a diferenca entre o que se comprou e o que as vendas usaram
+ *    e o que a ficha nao enxerga — sobra, desperdicio, estoque parado.
  */
 
 export type TipoDespesa = 'custo' | 'variavel' | 'fixa'
@@ -108,12 +117,22 @@ export function rotuloMes(mes: string): string {
 
 export interface ResultadoDoMes {
   faturamentoCentavos: Centavos
+  /** ingredientes e embalagens que as vendas do mes consumiram, pelas fichas */
   custoProdutosCentavos: Centavos
+  /**
+   * Parte do faturamento vinda de itens SEM custo conhecido (sem ficha nem
+   * custo informado, ou venda anterior a gravacao do custo). Acima de zero, o
+   * resultado esta maior do que o real, e a tela precisa dizer isso.
+   */
+  faturamentoSemCustoCentavos: Centavos
+  /** compras de ingredientes e embalagens lancadas no mes — comparacao, nao entram no resultado */
+  comprasCentavos: Centavos
   despesasVariaveisCentavos: Centavos
   /** faturamento − custo dos produtos − despesas variaveis */
   margemContribuicaoCentavos: Centavos
   despesasFixasCentavos: Centavos
   resultadoCentavos: Centavos
+  /** variaveis + fixas: o que de fato e subtraido como despesa */
   totalDespesasCentavos: Centavos
   /** resultado / faturamento; null sem faturamento (nao existe "margem de 0 venda") */
   margemPercentual: number | null
@@ -131,9 +150,23 @@ export interface ResultadoDoMes {
 
 export function resultadoDoMes(mes: string, vendas: Venda[], despesas: Despesa[]): ResultadoDoMes {
   const [inicio, fim] = intervaloDoMes(mes)
-  const faturamentoCentavos = vendas
-    .filter((v) => !v.canceladaEm && v.criadaEm >= inicio && v.criadaEm < fim)
-    .reduce((s, v) => s + v.totalCentavos, 0)
+  let faturamentoCentavos = 0
+  let custoProdutosCentavos = 0
+  let faturamentoSemCustoCentavos = 0
+  for (const v of vendas) {
+    if (v.canceladaEm || v.criadaEm < inicio || v.criadaEm >= fim) continue
+    faturamentoCentavos += v.totalCentavos
+    const subtotal = v.itens.reduce((s, i) => s + i.precoUnitarioCentavos * i.quantidade, 0)
+    for (const i of v.itens) {
+      if (i.custoMateriaisCentavos != null) {
+        custoProdutosCentavos += i.custoMateriaisCentavos * i.quantidade
+      } else if (subtotal > 0) {
+        // o desconto da venda e rateado pelo peso do item, para a soma das
+        // partes bater com o faturamento
+        faturamentoSemCustoCentavos += (i.precoUnitarioCentavos * i.quantidade * v.totalCentavos) / subtotal
+      }
+    }
+  }
 
   const doMes = despesas.filter((d) => d.mes === mes)
   const totais = new Map<string, number>()
@@ -146,21 +179,25 @@ export function resultadoDoMes(mes: string, vendas: Venda[], despesas: Despesa[]
     if (!d.pagoEm) aPagarCentavos += d.valorCentavos
   }
 
-  const margemContribuicaoCentavos = faturamentoCentavos - porTipo.custo - porTipo.variavel
+  const margemContribuicaoCentavos = faturamentoCentavos - custoProdutosCentavos - porTipo.variavel
   const resultadoCentavos = margemContribuicaoCentavos - porTipo.fixa
   const indice = faturamentoCentavos > 0 ? margemContribuicaoCentavos / faturamentoCentavos : 0
 
   return {
     faturamentoCentavos,
-    custoProdutosCentavos: porTipo.custo,
+    custoProdutosCentavos,
+    faturamentoSemCustoCentavos: Math.round(faturamentoSemCustoCentavos),
+    comprasCentavos: porTipo.custo,
     despesasVariaveisCentavos: porTipo.variavel,
     margemContribuicaoCentavos,
     despesasFixasCentavos: porTipo.fixa,
     resultadoCentavos,
-    totalDespesasCentavos: porTipo.custo + porTipo.variavel + porTipo.fixa,
+    totalDespesasCentavos: porTipo.variavel + porTipo.fixa,
     margemPercentual: faturamentoCentavos > 0 ? (resultadoCentavos / faturamentoCentavos) * 100 : null,
     aPagarCentavos,
-    porCategoria: CATEGORIAS.filter((c) => totais.has(c.codigo))
+    // compras ficam fora de "para onde foi": nao sao subtraidas no resultado,
+    // e mistura-las faria as barras somarem mais do que a conta mostra
+    porCategoria: CATEGORIAS.filter((c) => c.tipo !== 'custo' && totais.has(c.codigo))
       .map((c) => ({ ...c, totalCentavos: totais.get(c.codigo)! }))
       .sort((a, b) => b.totalCentavos - a.totalCentavos),
     pontoEquilibrioCentavos: indice > 0 ? Math.round(porTipo.fixa / indice) : null,
