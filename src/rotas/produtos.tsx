@@ -507,7 +507,7 @@ function FormProduto({
               </div>
               {/* repor a fornada sem teclado */}
               <div className="mt-2 flex gap-2">
-                {[5, 10, 20].map((n) => (
+                {[4, 8, 12].map((n) => (
                   <button
                     key={n}
                     onClick={() => setR({ ...r, estoque: r.estoque! + n })}
